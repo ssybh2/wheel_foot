@@ -1,0 +1,376 @@
+<?xml version="1.0"?>
+<robot name="wheel_leg_robot">
+
+  <!-- ================= materials ================= -->
+  <material name="base_gray">
+    <color rgba="0.65 0.65 0.65 1"/>
+  </material>
+
+  <material name="label_red">
+    <color rgba="1 0 0 1"/>
+  </material>
+
+  <material name="label_green">
+    <color rgba="0 1 0 1"/>
+  </material>
+
+  <material name="label_blue">
+    <color rgba="0 0.25 1 1"/>
+  </material>
+
+  <material name="label_yellow">
+    <color rgba="1 1 0 1"/>
+  </material>
+
+  <material name="label_magenta">
+    <color rgba="1 0 1 1"/>
+  </material>
+
+  <material name="label_cyan">
+    <color rgba="0 1 1 1"/>
+  </material>
+
+  <material name="label_orange">
+    <color rgba="1 0.45 0 1"/>
+  </material>
+
+  <material name="label_black">
+    <color rgba="0.02 0.02 0.02 1"/>
+  </material>
+
+
+  <!-- ================= world ================= -->
+<!-- ================= base ================= -->
+  <link name="base_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="2.0"/>
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
+    </inertial>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.35 0.25 0.18"/>
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 1.5708 0"/>
+      <geometry>
+        <mesh filename="file:///home/hby/foot_ws/src/wheel_leg_description/meshes/visual/shell_and_big_motor.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="base_gray"/>
+    </visual>
+  </link>
+<!-- base label -->
+<!-- ========================================================= -->
+  <!-- big_arm_1_joint: blue big arm -> cyan small_leg_wheel_2 -> wheel_motor_2 -->
+  <!-- ========================================================= -->
+
+  <link name="big_arm_1_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.2"/>
+      <inertia ixx="0.0005" ixy="0" ixz="0" iyy="0.0005" iyz="0" izz="0.0005"/>
+    </inertial>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.1 0.025 0.025"/>
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="-0.231306 -0.053564 -0.030643" rpy="0 1.5708 0"/>
+      <geometry>
+        <mesh filename="file:///home/hby/foot_ws/src/wheel_leg_description/meshes/visual/big_arm_1.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="big_arm_1_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="big_arm_1_link"/>
+    <origin xyz="0.231306 0.053564 0.030643" rpy="0 0 0"/>
+</joint>
+<link name="small_leg_wheel_2_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.25"/>
+      <inertia ixx="0.0008" ixy="0" ixz="0" iyy="0.0008" iyz="0" izz="0.0008"/>
+    </inertial>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.14 0.025 0.025"/>
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="-0.306005 0.083436 -0.002006" rpy="0 1.5708 0"/>
+      <geometry>
+        <mesh filename="file:///home/hby/foot_ws/src/wheel_leg_description/meshes/visual/small_leg_wheel_2.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="knee_1_joint" type="fixed">
+    <parent link="big_arm_1_link"/>
+    <child link="small_leg_wheel_2_link"/>
+    <origin xyz="0.074699 -0.137000 -0.028637" rpy="0 0 0"/>
+</joint>
+<link name="wheel_motor_2_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.5"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+    </inertial>
+    <collision>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry>
+        <cylinder radius="0.045" length="0.035"/>
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="-0.201207 0.083436 0.056453" rpy="0 1.5708 0"/>
+      <geometry>
+        <mesh filename="file:///home/hby/foot_ws/src/wheel_leg_description/meshes/visual/wheel_motor_2.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="wheel_2_joint" type="continuous">
+    <parent link="small_leg_wheel_2_link"/>
+    <child link="wheel_motor_2_link"/>
+    <origin xyz="-0.104798 0 -0.058459" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+<!-- ========================================================= -->
+  <!-- big_arm_2_joint: green big arm -> orange small_leg_wheel_1 -> wheel_motor_1 -->
+  <!-- ========================================================= -->
+
+  <link name="big_arm_2_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.2"/>
+      <inertia ixx="0.0005" ixy="0" ixz="0" iyy="0.0005" iyz="0" izz="0.0005"/>
+    </inertial>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.1 0.025 0.025"/>
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="-0.161440 -0.053564 -0.026313" rpy="0 1.5708 0"/>
+      <geometry>
+        <mesh filename="file:///home/hby/foot_ws/src/wheel_leg_description/meshes/visual/big_arm_2.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="big_arm_2_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="big_arm_2_link"/>
+    <origin xyz="0.161440 0.053564 0.026313" rpy="0 0 0"/>
+</joint>
+<link name="small_leg_wheel_1_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.25"/>
+      <inertia ixx="0.0008" ixy="0" ixz="0" iyy="0.0008" iyz="0" izz="0.0008"/>
+    </inertial>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.14 0.025 0.025"/>
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="-0.091299 -0.088564 0.012160" rpy="0 1.5708 0"/>
+      <geometry>
+        <mesh filename="file:///home/hby/foot_ws/src/wheel_leg_description/meshes/visual/small_leg_wheel_1.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="knee_2_joint" type="fixed">
+    <parent link="big_arm_2_link"/>
+    <child link="small_leg_wheel_1_link"/>
+    <origin xyz="-0.070141 0.035000 -0.038473" rpy="0 0 0"/>
+</joint>
+<link name="wheel_motor_1_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.5"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+    </inertial>
+    <collision>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry>
+        <cylinder radius="0.045" length="0.035"/>
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="-0.204820 -0.080564 0.051057" rpy="0 1.5708 0"/>
+      <geometry>
+        <mesh filename="file:///home/hby/foot_ws/src/wheel_leg_description/meshes/visual/wheel_motor_1.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="wheel_1_joint" type="continuous">
+    <parent link="small_leg_wheel_1_link"/>
+    <child link="wheel_motor_1_link"/>
+    <origin xyz="0.113521 -0.008000 -0.038897" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+<!-- ========================================================= -->
+  <!-- big_arm_3_joint: red big arm -> magenta small_leggy_1 -->
+  <!-- ========================================================= -->
+
+  <link name="big_arm_3_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.2"/>
+      <inertia ixx="0.0005" ixy="0" ixz="0" iyy="0.0005" iyz="0" izz="0.0005"/>
+    </inertial>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.1 0.025 0.025"/>
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="-0.231306 0.048436 -0.030643" rpy="0 1.5708 0"/>
+      <geometry>
+        <mesh filename="file:///home/hby/foot_ws/src/wheel_leg_description/meshes/visual/big_arm_3.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="big_arm_3_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="big_arm_3_link"/>
+    <origin xyz="0.231306 -0.048436 0.030643" rpy="0 0 0"/>
+</joint>
+<link name="small_leggy_1_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.15"/>
+      <inertia ixx="0.0004" ixy="0" ixz="0" iyy="0.0004" iyz="0" izz="0.0004"/>
+    </inertial>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.14 0.02 0.02"/>
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="-0.308448 -0.080564 -0.009451" rpy="0 1.5708 0"/>
+      <geometry>
+        <mesh filename="file:///home/hby/foot_ws/src/wheel_leg_description/meshes/visual/small_leggy_1.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="knee_3_joint" type="fixed">
+    <parent link="big_arm_3_link"/>
+    <child link="small_leggy_1_link"/>
+    <origin xyz="0.077142 0.129000 -0.021192" rpy="0 0 0"/>
+</joint>
+<!-- ========================================================= -->
+  <!-- big_arm_4_joint: yellow big arm -> yellow small_leggy_2 -->
+  <!-- ========================================================= -->
+
+  <link name="big_arm_4_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.2"/>
+      <inertia ixx="0.0005" ixy="0" ixz="0" iyy="0.0005" iyz="0" izz="0.0005"/>
+    </inertial>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.1 0.025 0.025"/>
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="-0.161440 0.048436 -0.026313" rpy="0 1.5708 0"/>
+      <geometry>
+        <mesh filename="file:///home/hby/foot_ws/src/wheel_leg_description/meshes/visual/big_arm_4.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="big_arm_4_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="big_arm_4_link"/>
+    <origin xyz="0.161440 -0.048436 0.026313" rpy="0 0 0"/>
+</joint>
+<link name="small_leggy_2_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.15"/>
+      <inertia ixx="0.0004" ixy="0" ixz="0" iyy="0.0004" iyz="0" izz="0.0004"/>
+    </inertial>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.14 0.02 0.02"/>
+      </geometry>
+    </collision>
+    <visual>
+      <origin xyz="-0.090381 0.075436 0.010437" rpy="0 1.5708 0"/>
+      <geometry>
+        <mesh filename="file:///home/hby/foot_ws/src/wheel_leg_description/meshes/visual/small_leggy_2.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="knee_4_joint" type="fixed">
+    <parent link="big_arm_4_link"/>
+    <child link="small_leggy_2_link"/>
+    <origin xyz="-0.071059 -0.027000 -0.036750" rpy="0 0 0"/>
+</joint>
+
+  <!-- ================= ros2_control for Gazebo ================= -->
+  <ros2_control name="GazeboSystem" type="system">
+    <hardware>
+      <plugin>gazebo_ros2_control/GazeboSystem</plugin>
+    </hardware>
+
+    <joint name="wheel_1_joint">
+      <command_interface name="velocity">
+        <param name="min">-50</param>
+        <param name="max">50</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="wheel_2_joint">
+      <command_interface name="velocity">
+        <param name="min">-50</param>
+        <param name="max">50</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+  </ros2_control>
+
+  <gazebo>
+    <plugin name="gazebo_ros2_control" filename="libgazebo_ros2_control.so">
+      <parameters>/home/hby/foot_ws/src/wheel_leg_description/config/wheel_controllers.yaml</parameters>
+    </plugin>
+  </gazebo>
+
+</robot>

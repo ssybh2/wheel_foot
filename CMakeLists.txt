@@ -32,6 +32,6 @@ install(PROGRAMS
 
 ament_package()
 install(
-  DIRECTORY urdf meshes launch rviz worlds
+  DIRECTORY urdf meshes launch rviz worlds config
   DESTINATION share/${PROJECT_NAME}
 )

@@ -1,0 +1,24 @@
+# ROS / colcon generated
+build/
+install/
+log/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary / backup
+*.bak
+*.backup
+*.tmp
