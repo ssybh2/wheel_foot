@@ -1,0 +1,224 @@
+<?xml version="1.0"?>
+<robot name="wheel_leg_robot">
+
+  <link name="world"/>
+
+  <!-- ================= base ================= -->
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://wheel_leg_description/meshes/visual/shell_and_big_motor.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="base_gray">
+        <color rgba="0.65 0.65 0.65 1"/>
+      </material>
+    </visual>
+  </link>
+
+  <joint name="world_to_base" type="fixed">
+    <parent link="world"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+
+  <!-- ========================================================= -->
+  <!-- big_arm_1: J1 -> K1 -> small_leg_wheel_1 -> W1 -> wheel_1 -->
+  <!-- ========================================================= -->
+
+  <link name="big_arm_1_link">
+    <visual>
+      <origin xyz="-0.231306 -0.053564 -0.030643" rpy="0 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://wheel_leg_description/meshes/visual/big_arm_1.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="big_arm_1_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="big_arm_1_link"/>
+    <origin xyz="0.231306 0.053564 0.030643" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.57" upper="1.57" effort="20" velocity="10"/>
+  </joint>
+
+  <link name="small_leg_wheel_1_link">
+    <visual>
+      <origin xyz="-0.308448 -0.080564 -0.009451" rpy="0 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://wheel_leg_description/meshes/visual/small_leg_wheel_1.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="knee_1_joint" type="revolute">
+    <parent link="big_arm_1_link"/>
+    <child link="small_leg_wheel_1_link"/>
+    <origin xyz="0.077142 0.027000 -0.021192" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.5" upper="2.5" effort="20" velocity="10"/>
+  </joint>
+
+  <link name="wheel_motor_1_link">
+    <visual>
+      <origin xyz="-0.204820 -0.080564 0.051057" rpy="0 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://wheel_leg_description/meshes/visual/wheel_motor_1.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="wheel_1_joint" type="continuous">
+    <parent link="small_leg_wheel_1_link"/>
+    <child link="wheel_motor_1_link"/>
+    <origin xyz="-0.103628 0 -0.060508" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+
+  <!-- ========================================== -->
+  <!-- big_arm_2: J2 -> K2 -> small_leggy_1        -->
+  <!-- ========================================== -->
+
+  <link name="big_arm_2_link">
+    <visual>
+      <origin xyz="-0.161440 -0.053564 -0.026313" rpy="0 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://wheel_leg_description/meshes/visual/big_arm_2.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="big_arm_2_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="big_arm_2_link"/>
+    <origin xyz="0.161440 0.053564 0.026313" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.57" upper="1.57" effort="20" velocity="10"/>
+  </joint>
+
+  <link name="small_leggy_1_link">
+    <visual>
+      <origin xyz="-0.091299 -0.088564 0.012160" rpy="0 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://wheel_leg_description/meshes/visual/small_leggy_1.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="knee_2_joint" type="revolute">
+    <parent link="big_arm_2_link"/>
+    <child link="small_leggy_1_link"/>
+    <origin xyz="-0.070141 0.035000 -0.038473" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.5" upper="2.5" effort="20" velocity="10"/>
+  </joint>
+
+
+  <!-- ========================================================= -->
+  <!-- big_arm_3: J3 -> K3 -> small_leg_wheel_2 -> W2 -> wheel_2 -->
+  <!-- ========================================================= -->
+
+  <link name="big_arm_3_link">
+    <visual>
+      <origin xyz="-0.231306 0.048436 -0.030643" rpy="0 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://wheel_leg_description/meshes/visual/big_arm_3.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="big_arm_3_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="big_arm_3_link"/>
+    <origin xyz="0.231306 -0.048436 0.030643" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.57" upper="1.57" effort="20" velocity="10"/>
+  </joint>
+
+  <link name="small_leg_wheel_2_link">
+    <visual>
+      <origin xyz="-0.306005 0.083436 -0.002006" rpy="0 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://wheel_leg_description/meshes/visual/small_leg_wheel_2.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="knee_3_joint" type="revolute">
+    <parent link="big_arm_3_link"/>
+    <child link="small_leg_wheel_2_link"/>
+    <origin xyz="0.074699 -0.035000 -0.028637" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.5" upper="2.5" effort="20" velocity="10"/>
+  </joint>
+
+  <link name="wheel_motor_2_link">
+    <visual>
+      <origin xyz="-0.201207 0.083436 0.056453" rpy="0 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://wheel_leg_description/meshes/visual/wheel_motor_2.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="wheel_2_joint" type="continuous">
+    <parent link="small_leg_wheel_2_link"/>
+    <child link="wheel_motor_2_link"/>
+    <origin xyz="-0.104798 0 -0.058459" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+
+  <!-- ========================================== -->
+  <!-- big_arm_4: J4 -> K4 -> small_leggy_2        -->
+  <!-- ========================================== -->
+
+  <link name="big_arm_4_link">
+    <visual>
+      <origin xyz="-0.161440 0.048436 -0.026313" rpy="0 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://wheel_leg_description/meshes/visual/big_arm_4.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="big_arm_4_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="big_arm_4_link"/>
+    <origin xyz="0.161440 -0.048436 0.026313" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.57" upper="1.57" effort="20" velocity="10"/>
+  </joint>
+
+  <link name="small_leggy_2_link">
+    <visual>
+      <origin xyz="-0.090381 0.075436 0.010437" rpy="0 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://wheel_leg_description/meshes/visual/small_leggy_2.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="knee_4_joint" type="revolute">
+    <parent link="big_arm_4_link"/>
+    <child link="small_leggy_2_link"/>
+    <origin xyz="-0.071059 -0.027000 -0.036750" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.5" upper="2.5" effort="20" velocity="10"/>
+  </joint>
+
+</robot>
