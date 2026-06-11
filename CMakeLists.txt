@@ -35,3 +35,9 @@ install(
   DIRECTORY urdf meshes launch rviz worlds config sdf
   DESTINATION share/${PROJECT_NAME}
 )
+
+
+install(
+  DIRECTORY sdf
+  DESTINATION share/${PROJECT_NAME}
+)

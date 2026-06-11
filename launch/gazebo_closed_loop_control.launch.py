@@ -10,10 +10,18 @@ from launch_ros.actions import Node
 def generate_launch_description():
     pkg_share = get_package_share_directory('wheel_leg_description')
 
+    sdf_file = os.path.join(
+        pkg_share,
+        'sdf',
+        'wheel_leg_robot_closed_loop_control.sdf'
+    )
+
+    # This URDF is used only to provide robot_description for gazebo_ros2_control.
+    # The actual robot physics model is spawned from the SDF above.
     urdf_file = os.path.join(
         pkg_share,
         'urdf',
-        'wheel_leg_robot_gazebo_passive_stl.urdf'
+        'wheel_leg_robot_gazebo_control_stl.urdf'
     )
 
     world_file = os.path.join(
@@ -43,14 +51,19 @@ def generate_launch_description():
         executable='robot_state_publisher',
         name='robot_state_publisher',
         output='screen',
-        parameters=[{'robot_description': robot_description}]
+        parameters=[
+            {
+                'robot_description': robot_description,
+                'use_sim_time': True
+            }
+        ]
     )
 
     spawn_robot = Node(
         package='gazebo_ros',
         executable='spawn_entity.py',
         arguments=[
-            '-topic', 'robot_description',
+            '-file', sdf_file,
             '-entity', 'wheel_leg_robot',
             '-x', '0',
             '-y', '0',
@@ -59,9 +72,33 @@ def generate_launch_description():
         output='screen'
     )
 
+    joint_state_broadcaster_spawner = Node(
+        package='controller_manager',
+        executable='spawner',
+        arguments=[
+            'joint_state_broadcaster',
+            '--controller-manager',
+            '/controller_manager'
+        ],
+        output='screen'
+    )
+
+    wheel_controller_spawner = Node(
+        package='controller_manager',
+        executable='spawner',
+        arguments=[
+            'wheel_velocity_controller',
+            '--controller-manager',
+            '/controller_manager'
+        ],
+        output='screen'
+    )
+
     return LaunchDescription([
         SetEnvironmentVariable('GAZEBO_MODEL_DATABASE_URI', ''),
         gazebo,
         robot_state_publisher,
-        TimerAction(period=3.0, actions=[spawn_robot]),
+        TimerAction(period=4.0, actions=[spawn_robot]),
+        TimerAction(period=10.0, actions=[joint_state_broadcaster_spawner]),
+        TimerAction(period=11.0, actions=[wheel_controller_spawner]),
     ])
