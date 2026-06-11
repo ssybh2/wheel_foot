@@ -10,10 +10,10 @@ from launch_ros.actions import Node
 def generate_launch_description():
     pkg_share = get_package_share_directory('wheel_leg_description')
 
-    urdf_file = os.path.join(
+    sdf_file = os.path.join(
         pkg_share,
-        'urdf',
-        'wheel_leg_robot_gazebo_locked.urdf'
+        'sdf',
+        'wheel_leg_robot_closed_loop_passive.sdf'
     )
 
     world_file = os.path.join(
@@ -21,9 +21,6 @@ def generate_launch_description():
         'worlds',
         'wheel_leg_ground.world'
     )
-
-    with open(urdf_file, 'r') as f:
-        robot_description = f.read()
 
     gazebo_ros_share = get_package_share_directory('gazebo_ros')
 
@@ -38,23 +35,15 @@ def generate_launch_description():
         }.items()
     )
 
-    robot_state_publisher = Node(
-        package='robot_state_publisher',
-        executable='robot_state_publisher',
-        name='robot_state_publisher',
-        output='screen',
-        parameters=[{'robot_description': robot_description}]
-    )
-
     spawn_robot = Node(
         package='gazebo_ros',
         executable='spawn_entity.py',
         arguments=[
-            '-topic', 'robot_description',
+            '-file', sdf_file,
             '-entity', 'wheel_leg_robot',
             '-x', '0',
             '-y', '0',
-            '-z', '0.25'
+            '-z', '1.0'
         ],
         output='screen'
     )
@@ -62,6 +51,5 @@ def generate_launch_description():
     return LaunchDescription([
         SetEnvironmentVariable('GAZEBO_MODEL_DATABASE_URI', ''),
         gazebo,
-        robot_state_publisher,
         TimerAction(period=3.0, actions=[spawn_robot]),
     ])

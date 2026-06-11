@@ -1,7 +1,6 @@
-<?xml version="1.0"?>
 <robot name="wheel_leg_robot">
 
-  <!-- ================= materials ================= -->
+  
   <material name="base_gray">
     <color rgba="0.65 0.65 0.65 1"/>
   </material>
@@ -39,8 +38,8 @@
   </material>
 
 
-  <!-- ================= world ================= -->
-<!-- ================= base ================= -->
+  
+
   <link name="base_link">
     <inertial>
       <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -62,10 +61,10 @@
       <material name="base_gray"/>
     </visual>
   </link>
-<!-- base label -->
-<!-- ========================================================= -->
-  <!-- big_arm_1_joint: blue big arm -> cyan small_leg_wheel_2 -> wheel_motor_2 -->
-  <!-- ========================================================= -->
+
+
+  
+  
 
   <link name="big_arm_1_link">
     <inertial>
@@ -88,11 +87,16 @@
     </visual>
   </link>
 
-  <joint name="big_arm_1_joint" type="fixed">
+  
+  <joint name="big_arm_1_joint" type="revolute">
+    <origin xyz="0.231306 0.053564 0.030643" rpy="0 0 0"/>
     <parent link="base_link"/>
     <child link="big_arm_1_link"/>
-    <origin xyz="0.231306 0.053564 0.030643" rpy="0 0 0"/>
-</joint>
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.6" upper="2.6" effort="0.0" velocity="20.0"/>
+    <dynamics damping="0.15" friction="0.02"/>
+  </joint>
+
 <link name="small_leg_wheel_2_link">
     <inertial>
       <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -114,11 +118,16 @@
     </visual>
   </link>
 
-  <joint name="knee_1_joint" type="fixed">
+  
+  <joint name="knee_1_joint" type="revolute">
+    <origin xyz="0.074699 -0.137000 -0.028637" rpy="0 0 0"/>
     <parent link="big_arm_1_link"/>
     <child link="small_leg_wheel_2_link"/>
-    <origin xyz="0.074699 -0.137000 -0.028637" rpy="0 0 0"/>
-</joint>
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.6" upper="2.6" effort="0.0" velocity="20.0"/>
+    <dynamics damping="0.15" friction="0.02"/>
+  </joint>
+
 <link name="wheel_motor_2_link">
     <inertial>
       <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -145,10 +154,12 @@
     <child link="wheel_motor_2_link"/>
     <origin xyz="-0.104798 0 -0.058459" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
+  
+    <dynamics damping="0.02" friction="0.005"/>
   </joint>
-<!-- ========================================================= -->
-  <!-- big_arm_2_joint: green big arm -> orange small_leg_wheel_1 -> wheel_motor_1 -->
-  <!-- ========================================================= -->
+
+  
+  
 
   <link name="big_arm_2_link">
     <inertial>
@@ -171,11 +182,16 @@
     </visual>
   </link>
 
-  <joint name="big_arm_2_joint" type="fixed">
+  
+  <joint name="big_arm_2_joint" type="revolute">
+    <origin xyz="0.161440 0.053564 0.026313" rpy="0 0 0"/>
     <parent link="base_link"/>
     <child link="big_arm_2_link"/>
-    <origin xyz="0.161440 0.053564 0.026313" rpy="0 0 0"/>
-</joint>
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.6" upper="2.6" effort="0.0" velocity="20.0"/>
+    <dynamics damping="0.15" friction="0.02"/>
+  </joint>
+
 <link name="small_leg_wheel_1_link">
     <inertial>
       <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -197,11 +213,16 @@
     </visual>
   </link>
 
-  <joint name="knee_2_joint" type="fixed">
+  
+  <joint name="knee_2_joint" type="revolute">
+    <origin xyz="-0.070141 0.035000 -0.038473" rpy="0 0 0"/>
     <parent link="big_arm_2_link"/>
     <child link="small_leg_wheel_1_link"/>
-    <origin xyz="-0.070141 0.035000 -0.038473" rpy="0 0 0"/>
-</joint>
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.6" upper="2.6" effort="0.0" velocity="20.0"/>
+    <dynamics damping="0.15" friction="0.02"/>
+  </joint>
+
 <link name="wheel_motor_1_link">
     <inertial>
       <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -228,10 +249,12 @@
     <child link="wheel_motor_1_link"/>
     <origin xyz="0.113521 -0.008000 -0.038897" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
+  
+    <dynamics damping="0.02" friction="0.005"/>
   </joint>
-<!-- ========================================================= -->
-  <!-- big_arm_3_joint: red big arm -> magenta small_leggy_1 -->
-  <!-- ========================================================= -->
+
+  
+  
 
   <link name="big_arm_3_link">
     <inertial>
@@ -254,11 +277,16 @@
     </visual>
   </link>
 
-  <joint name="big_arm_3_joint" type="fixed">
+  
+  <joint name="big_arm_3_joint" type="revolute">
+    <origin xyz="0.231306 -0.048436 0.030643" rpy="0 0 0"/>
     <parent link="base_link"/>
     <child link="big_arm_3_link"/>
-    <origin xyz="0.231306 -0.048436 0.030643" rpy="0 0 0"/>
-</joint>
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.6" upper="2.6" effort="0.0" velocity="20.0"/>
+    <dynamics damping="0.15" friction="0.02"/>
+  </joint>
+
 <link name="small_leggy_1_link">
     <inertial>
       <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -280,14 +308,19 @@
     </visual>
   </link>
 
-  <joint name="knee_3_joint" type="fixed">
+  
+  <joint name="knee_3_joint" type="revolute">
+    <origin xyz="0.077142 0.129000 -0.021192" rpy="0 0 0"/>
     <parent link="big_arm_3_link"/>
     <child link="small_leggy_1_link"/>
-    <origin xyz="0.077142 0.129000 -0.021192" rpy="0 0 0"/>
-</joint>
-<!-- ========================================================= -->
-  <!-- big_arm_4_joint: yellow big arm -> yellow small_leggy_2 -->
-  <!-- ========================================================= -->
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.6" upper="2.6" effort="0.0" velocity="20.0"/>
+    <dynamics damping="0.15" friction="0.02"/>
+  </joint>
+
+
+  
+  
 
   <link name="big_arm_4_link">
     <inertial>
@@ -310,11 +343,16 @@
     </visual>
   </link>
 
-  <joint name="big_arm_4_joint" type="fixed">
+  
+  <joint name="big_arm_4_joint" type="revolute">
+    <origin xyz="0.161440 -0.048436 0.026313" rpy="0 0 0"/>
     <parent link="base_link"/>
     <child link="big_arm_4_link"/>
-    <origin xyz="0.161440 -0.048436 0.026313" rpy="0 0 0"/>
-</joint>
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.6" upper="2.6" effort="0.0" velocity="20.0"/>
+    <dynamics damping="0.15" friction="0.02"/>
+  </joint>
+
 <link name="small_leggy_2_link">
     <inertial>
       <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -336,41 +374,29 @@
     </visual>
   </link>
 
-  <joint name="knee_4_joint" type="fixed">
+  
+  <joint name="knee_4_joint" type="revolute">
+    <origin xyz="-0.071059 -0.027000 -0.036750" rpy="0 0 0"/>
     <parent link="big_arm_4_link"/>
     <child link="small_leggy_2_link"/>
-    <origin xyz="-0.071059 -0.027000 -0.036750" rpy="0 0 0"/>
-</joint>
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.6" upper="2.6" effort="0.0" velocity="20.0"/>
+    <dynamics damping="0.15" friction="0.02"/>
+  </joint>
 
-  <!-- ================= ros2_control for Gazebo ================= -->
-  <ros2_control name="GazeboSystem" type="system">
-    <hardware>
-      <plugin>gazebo_ros2_control/GazeboSystem</plugin>
-    </hardware>
 
-    <joint name="wheel_1_joint">
-      <command_interface name="velocity">
-        <param name="min">-50</param>
-        <param name="max">50</param>
-      </command_interface>
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-    </joint>
+  <gazebo reference="wheel_motor_1_link">
+    <mu1>1.5</mu1>
+    <mu2>1.5</mu2>
+    <kp>1000000.0</kp>
+    <kd>10.0</kd>
+  </gazebo>
 
-    <joint name="wheel_2_joint">
-      <command_interface name="velocity">
-        <param name="min">-50</param>
-        <param name="max">50</param>
-      </command_interface>
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-    </joint>
-  </ros2_control>
-
-  <gazebo>
-    <plugin name="gazebo_ros2_control" filename="libgazebo_ros2_control.so">
-      <parameters>/home/hby/foot_ws/src/wheel_leg_description/config/wheel_controllers.yaml</parameters>
-    </plugin>
+  <gazebo reference="wheel_motor_2_link">
+    <mu1>1.5</mu1>
+    <mu2>1.5</mu2>
+    <kp>1000000.0</kp>
+    <kd>10.0</kd>
   </gazebo>
 
 </robot>
