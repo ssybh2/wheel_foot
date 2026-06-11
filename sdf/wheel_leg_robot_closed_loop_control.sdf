@@ -40,7 +40,7 @@
         <limit>
           <lower>-2.6</lower>
           <upper>2.6</upper>
-          <effort>0</effort>
+          <effort>10</effort>
           <velocity>20</velocity>
         </limit>
         <dynamics>
@@ -92,7 +92,7 @@
         <limit>
           <lower>-2.6</lower>
           <upper>2.6</upper>
-          <effort>0</effort>
+          <effort>10</effort>
           <velocity>20</velocity>
         </limit>
         <dynamics>
@@ -209,7 +209,7 @@
         <limit>
           <lower>-2.6</lower>
           <upper>2.6</upper>
-          <effort>0</effort>
+          <effort>10</effort>
           <velocity>20</velocity>
         </limit>
         <dynamics>
@@ -261,7 +261,7 @@
         <limit>
           <lower>-2.6</lower>
           <upper>2.6</upper>
-          <effort>0</effort>
+          <effort>10</effort>
           <velocity>20</velocity>
         </limit>
         <dynamics>
@@ -378,7 +378,7 @@
         <limit>
           <lower>-2.6</lower>
           <upper>2.6</upper>
-          <effort>0</effort>
+          <effort>10</effort>
           <velocity>20</velocity>
         </limit>
         <dynamics>
@@ -430,7 +430,7 @@
         <limit>
           <lower>-2.6</lower>
           <upper>2.6</upper>
-          <effort>0</effort>
+          <effort>10</effort>
           <velocity>20</velocity>
         </limit>
         <dynamics>
@@ -482,7 +482,7 @@
         <limit>
           <lower>-2.6</lower>
           <upper>2.6</upper>
-          <effort>0</effort>
+          <effort>10</effort>
           <velocity>20</velocity>
         </limit>
         <dynamics>
@@ -534,7 +534,7 @@
         <limit>
           <lower>-2.6</lower>
           <upper>2.6</upper>
-          <effort>0</effort>
+          <effort>10</effort>
           <velocity>20</velocity>
         </limit>
         <dynamics>
@@ -614,31 +614,68 @@
 
   
     <!-- ================= ros2_control: wheel velocity control ================= -->
-    <ros2_control name="GazeboSystem" type="system">
-      <hardware>
-        <plugin>gazebo_ros2_control/GazeboSystem</plugin>
-      </hardware>
 
-      <joint name="wheel_1_joint">
-        <command_interface name="velocity">
-          <param name="min">-50</param>
-          <param name="max">50</param>
-        </command_interface>
-        <state_interface name="position"/>
-        <state_interface name="velocity"/>
-      </joint>
+  <ros2_control name="GazeboSystem" type="system">
+    <hardware>
+      <plugin>gazebo_ros2_control/GazeboSystem</plugin>
+    </hardware>
 
-      <joint name="wheel_2_joint">
-        <command_interface name="velocity">
-          <param name="min">-50</param>
-          <param name="max">50</param>
-        </command_interface>
-        <state_interface name="position"/>
-        <state_interface name="velocity"/>
-      </joint>
-    </ros2_control>
+    <joint name="wheel_1_joint">
+      <command_interface name="velocity">
+        <param name="min">-50</param>
+        <param name="max">50</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
 
-    <plugin name="gazebo_ros2_control" filename="libgazebo_ros2_control.so">
+    <joint name="wheel_2_joint">
+      <command_interface name="velocity">
+        <param name="min">-50</param>
+        <param name="max">50</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="big_arm_1_joint">
+      <command_interface name="effort">
+        <param name="min">-8</param>
+        <param name="max">8</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="big_arm_2_joint">
+      <command_interface name="effort">
+        <param name="min">-8</param>
+        <param name="max">8</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="big_arm_3_joint">
+      <command_interface name="effort">
+        <param name="min">-8</param>
+        <param name="max">8</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="big_arm_4_joint">
+      <command_interface name="effort">
+        <param name="min">-8</param>
+        <param name="max">8</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+  </ros2_control>
+
+<plugin name="gazebo_ros2_control" filename="libgazebo_ros2_control.so">
       <parameters>/home/hby/foot_ws/src/wheel_leg_description/config/wheel_controllers.yaml</parameters>
     </plugin>
 

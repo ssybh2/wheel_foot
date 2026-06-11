@@ -363,9 +363,45 @@
       <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
+
+    <joint name="big_arm_1_joint">
+      <command_interface name="effort">
+        <param name="min">-8</param>
+        <param name="max">8</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="big_arm_2_joint">
+      <command_interface name="effort">
+        <param name="min">-8</param>
+        <param name="max">8</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="big_arm_3_joint">
+      <command_interface name="effort">
+        <param name="min">-8</param>
+        <param name="max">8</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="big_arm_4_joint">
+      <command_interface name="effort">
+        <param name="min">-8</param>
+        <param name="max">8</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
   </ros2_control>
 
-  <gazebo>
+<gazebo>
     <plugin name="gazebo_ros2_control" filename="libgazebo_ros2_control.so">
       <parameters>/home/hby/foot_ws/src/wheel_leg_description/config/wheel_controllers.yaml</parameters>
     </plugin>

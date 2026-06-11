@@ -16,8 +16,6 @@ def generate_launch_description():
         'wheel_leg_robot_closed_loop_control.sdf'
     )
 
-    # This URDF is used only to provide robot_description for gazebo_ros2_control.
-    # The actual robot physics model is spawned from the SDF above.
     urdf_file = os.path.join(
         pkg_share,
         'urdf',
@@ -94,6 +92,17 @@ def generate_launch_description():
         output='screen'
     )
 
+    leg_effort_controller_spawner = Node(
+        package='controller_manager',
+        executable='spawner',
+        arguments=[
+            'leg_effort_controller',
+            '--controller-manager',
+            '/controller_manager'
+        ],
+        output='screen'
+    )
+
     return LaunchDescription([
         SetEnvironmentVariable('GAZEBO_MODEL_DATABASE_URI', ''),
         gazebo,
@@ -101,4 +110,5 @@ def generate_launch_description():
         TimerAction(period=4.0, actions=[spawn_robot]),
         TimerAction(period=10.0, actions=[joint_state_broadcaster_spawner]),
         TimerAction(period=11.0, actions=[wheel_controller_spawner]),
+        TimerAction(period=12.0, actions=[leg_effort_controller_spawner]),
     ])
