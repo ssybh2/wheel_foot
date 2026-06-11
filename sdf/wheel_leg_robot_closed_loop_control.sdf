@@ -642,5 +642,18 @@
       <parameters>/home/hby/foot_ws/src/wheel_leg_description/config/wheel_controllers.yaml</parameters>
     </plugin>
 
+  
+    <!-- ================= base pose / velocity output ================= -->
+    <plugin name="base_odom" filename="libgazebo_ros_p3d.so">
+      <ros>
+        <namespace>/</namespace>
+        <remapping>odom:=base_odom</remapping>
+      </ros>
+      <body_name>base_link</body_name>
+      <frame_name>world</frame_name>
+      <update_rate>100.0</update_rate>
+      <gaussian_noise>0.0</gaussian_noise>
+    </plugin>
+
   </model>
 </sdf>

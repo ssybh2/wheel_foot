@@ -30,6 +30,18 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
+install(
+  PROGRAMS
+    scripts/balance_state_monitor.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(
+  PROGRAMS
+    scripts/lqr_balance_controller.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()
 install(
   DIRECTORY urdf meshes launch rviz worlds config sdf
@@ -40,4 +52,11 @@ install(
 install(
   DIRECTORY sdf
   DESTINATION share/${PROJECT_NAME}
+)
+
+
+install(
+  PROGRAMS
+    scripts/simple_balance_controller.py
+  DESTINATION lib/${PROJECT_NAME}
 )
