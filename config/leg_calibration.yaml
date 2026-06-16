@@ -17,8 +17,8 @@ leg_effort_symmetric_hold:
     j3: 0.150000000
     j4: -0.150000000
 
-    kp: 0.3
-    kd: 0.1
+    kp: 0.7
+    kd: 0.005
     max_effort: 2.0
     start_delay: 0.5
     use_sim_time: true

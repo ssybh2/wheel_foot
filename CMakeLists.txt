@@ -93,6 +93,13 @@ install(TARGETS controlled_disturbance_plugin
 )
 # END CONTROLLED_DISTURBANCE_PLUGIN
 
+
+install(
+  PROGRAMS
+    scripts/wheel_keyboard_teleop.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()
 install(
   DIRECTORY urdf meshes launch rviz worlds config sdf
