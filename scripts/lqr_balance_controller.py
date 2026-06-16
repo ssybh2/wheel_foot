@@ -73,9 +73,9 @@ class LQRBalanceController(Node):
         self.declare_parameter('r_u', 1.0)
 
         # Because current Gazebo controller accepts wheel velocity, not force.
-        self.declare_parameter('force_to_wheel_speed', 0.8)
+        self.declare_parameter('wheel_radius', 0.045)
         self.declare_parameter('control_sign', 1.0)
-        self.declare_parameter('max_wheel_speed', 8.0)
+        self.declare_parameter('max_wheel_torque', 3.0)
 
         self.declare_parameter('fall_angle_deg', 35.0)
 
@@ -93,7 +93,7 @@ class LQRBalanceController(Node):
 
         self.pub_cmd = self.create_publisher(
             Float64MultiArray,
-            '/wheel_velocity_controller/commands',
+            '/wheel_effort_controller/commands',
             10
         )
 
@@ -139,10 +139,9 @@ class LQRBalanceController(Node):
             return
 
         fall_angle = math.radians(float(self.get_parameter('fall_angle_deg').value))
-        max_wheel_speed = float(self.get_parameter('max_wheel_speed').value)
-        force_to_wheel_speed = float(self.get_parameter('force_to_wheel_speed').value)
+        wheel_radius = float(self.get_parameter('wheel_radius').value)
+        max_wheel_torque = float(self.get_parameter('max_wheel_torque').value)
         control_sign = float(self.get_parameter('control_sign').value)
-
         theta = self.pitch - self.pitch0
         theta_dot = self.pitch_rate
         x = self.x - self.x0
@@ -158,14 +157,13 @@ class LQRBalanceController(Node):
         state = np.array([[theta], [theta_dot], [x], [x_dot]])
 
         # Standard LQR law.
-        force_like_u = float(-(self.K @ state)[0, 0])
+        total_force = float(-(self.K @ state)[0, 0])
 
-        # Current controller expects wheel angular speed, so map force-like u to rad/s.
-        wheel_speed = control_sign * force_to_wheel_speed * force_like_u
+        # 当前LQR模型的输入u表示总水平驱动力，单位近似为N
+        torque_each = (control_sign* total_force* wheel_radius/ 2.0)
+        torque_each = max(-max_wheel_torque,min(max_wheel_torque, torque_each))
 
-        wheel_speed = max(-max_wheel_speed, min(max_wheel_speed, wheel_speed))
-
-        cmd.data = [wheel_speed, wheel_speed]
+        cmd.data = [torque_each, torque_each]
         self.pub_cmd.publish(cmd)
 
     def stop(self):

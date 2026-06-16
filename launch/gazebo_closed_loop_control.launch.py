@@ -65,7 +65,7 @@ def generate_launch_description():
             '-entity', 'wheel_leg_robot',
             '-x', '0',
             '-y', '0',
-            '-z', '1.0'
+            '-z', '0.11'
         ],
         output='screen'
     )
@@ -108,7 +108,7 @@ def generate_launch_description():
         gazebo,
         robot_state_publisher,
         TimerAction(period=4.0, actions=[spawn_robot]),
-        TimerAction(period=10.0, actions=[joint_state_broadcaster_spawner]),
-        TimerAction(period=11.0, actions=[wheel_controller_spawner]),
-        TimerAction(period=12.0, actions=[leg_effort_controller_spawner]),
+        TimerAction(period=5.0, actions=[joint_state_broadcaster_spawner]),
+        TimerAction(period=6.0, actions=[wheel_controller_spawner]),
+        TimerAction(period=7.0, actions=[leg_effort_controller_spawner]),
     ])
