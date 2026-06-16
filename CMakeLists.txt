@@ -51,6 +51,8 @@ install(
 install(
   PROGRAMS
     scripts/leg_effort_symmetric_hold.py
+    scripts/leg_roll_calibrator.py
+    scripts/leg_height_calibrator.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

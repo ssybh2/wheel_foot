@@ -1,0 +1,24 @@
+# Fixed-leg calibration result
+#
+# Source measurement:
+#   error(+delta) = -0.064517 mm
+#   error(-delta) = -0.061212 mm
+#   estimated nominal height error = -0.0628645 mm
+#
+# Acceptance tolerance:
+#   0.20 mm
+#
+# No differential compensation is required.
+
+leg_effort_symmetric_hold:
+  ros__parameters:
+    j1: 0.150000000
+    j2: -0.150000000
+    j3: 0.150000000
+    j4: -0.150000000
+
+    kp: 30.0
+    kd: 0.5
+    max_effort: 2.0
+    start_delay: 0.5
+    use_sim_time: true
