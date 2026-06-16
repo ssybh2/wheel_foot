@@ -17,7 +17,7 @@ leg_effort_symmetric_hold:
     j3: 0.150000000
     j4: -0.150000000
 
-    kp: 30.0
+    kp: 1.0
     kd: 0.5
     max_effort: 2.0
     start_delay: 0.5
