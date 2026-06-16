@@ -692,24 +692,5 @@
       <gaussian_noise>0.0</gaussian_noise>
     </plugin>
 
-      <!-- BEGIN CONTROLLED_DISTURBANCE_PLUGIN -->
-    <plugin
-      name="controlled_disturbance"
-      filename="libcontrolled_disturbance_plugin.so">
-
-      <ros>
-        <namespace>/disturbance</namespace>
-      </ros>
-
-      <!-- Keep all these fixed during a position-only experiment. -->
-      <target_link>base_link</target_link>
-      <marker_model>disturbance_marker</marker_model>
-      <force_frame>world</force_frame>
-      <force_direction>1 0 0</force_direction>
-      <peak_force>10.0</peak_force>
-      <duration>0.10</duration>
-    </plugin>
-    <!-- END CONTROLLED_DISTURBANCE_PLUGIN -->
-
   </model>
 </sdf>

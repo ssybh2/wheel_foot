@@ -56,43 +56,6 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
-# BEGIN CONTROLLED_DISTURBANCE_PLUGIN
-find_package(rclcpp REQUIRED)
-find_package(std_srvs REQUIRED)
-find_package(gazebo_ros REQUIRED)
-find_package(gazebo REQUIRED)
-
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GAZEBO_CXX_FLAGS}")
-
-add_library(controlled_disturbance_plugin SHARED
-  src/controlled_disturbance_plugin.cpp
-)
-
-target_compile_features(controlled_disturbance_plugin PUBLIC cxx_std_17)
-
-target_include_directories(controlled_disturbance_plugin PRIVATE
-  ${GAZEBO_INCLUDE_DIRS}
-)
-
-target_link_directories(controlled_disturbance_plugin PRIVATE
-  ${GAZEBO_LIBRARY_DIRS}
-)
-
-target_link_libraries(controlled_disturbance_plugin
-  ${GAZEBO_LIBRARIES}
-)
-
-ament_target_dependencies(controlled_disturbance_plugin
-  rclcpp
-  std_srvs
-  gazebo_ros
-)
-
-install(TARGETS controlled_disturbance_plugin
-  LIBRARY DESTINATION lib
-)
-# END CONTROLLED_DISTURBANCE_PLUGIN
-
 ament_package()
 install(
   DIRECTORY urdf meshes launch rviz worlds config sdf
