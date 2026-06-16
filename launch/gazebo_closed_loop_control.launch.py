@@ -85,7 +85,7 @@ def generate_launch_description():
         package='controller_manager',
         executable='spawner',
         arguments=[
-            'wheel_velocity_controller',
+            'wheel_effort_controller',
             '--controller-manager',
             '/controller_manager'
         ],
