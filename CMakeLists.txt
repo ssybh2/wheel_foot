@@ -100,6 +100,13 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
+
+install(
+  PROGRAMS
+    scripts/six_motor_manual_controller.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()
 install(
   DIRECTORY urdf meshes launch rviz worlds config sdf
