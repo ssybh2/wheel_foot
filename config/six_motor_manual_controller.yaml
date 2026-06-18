@@ -22,7 +22,7 @@ six_motor_manual_controller:
     target_speed_slew_rate: 2.0
 
     # Velocity error -> body pitch reference
-    speed_to_pitch_gain: 14.2
+    speed_to_pitch_gain: 4.2
     max_pitch_ref_deg: 12.0
     pitch_ref_sign: 1.0
 
@@ -36,10 +36,10 @@ six_motor_manual_controller:
     # target. Tune the pattern signs if theta moves away from theta_ref.
     leg_lean_gain: 1.0
     max_leg_lean_offset: 0.25
-    leg_lean_j1: -5.0
-    leg_lean_j2: 5.0
-    leg_lean_j3: -5.0
-    leg_lean_j4: 5.0
+    leg_lean_j1: -1.0
+    leg_lean_j2: 1.0
+    leg_lean_j3: -1.0
+    leg_lean_j4: 1.0
     pitch_error_deadband_deg: 0.8
     leg_lean_effort_gain: 12.0
     max_leg_lean_effort: 3.0
@@ -49,7 +49,7 @@ six_motor_manual_controller:
     wheel_assist_pitch_kp: 0.4
     wheel_assist_pitch_kd: 0.08
     wheel_assist_velocity_kd: 0.12
-    max_wheel_assist_torque: 0.0
+    max_wheel_assist_torque: 1.2
 
     # Pitch and velocity feedback for wheel_balance mode
     balance_kp: 2.0

@@ -17,7 +17,7 @@
         <pose>0 0 0 0 -0 0</pose>
         <geometry>
           <box>
-            <size>0.35 0.25 0.18</size>
+            <size>0.35 0.25 0.09</size>
           </box>
         </geometry>
       </collision>
@@ -38,8 +38,8 @@
       <axis>
         <xyz>0 1 0</xyz>
         <limit>
-          <lower>-2.6</lower>
-          <upper>2.6</upper>
+          <lower>-1.6</lower>
+          <upper>1.6</upper>
           <effort>10</effort>
           <velocity>20</velocity>
         </limit>
