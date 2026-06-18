@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Unified six-motor keyboard teleoperation + balance controller.
+"""Synchronous six-motor keyboard controller for a wheel-leg robot.
 
-This node is the sole command publisher for:
+This node is intended to be the ONLY command publisher for:
 
   /leg_effort_controller/commands
       [big_arm_1, big_arm_2, big_arm_3, big_arm_4] effort, N*m
@@ -9,39 +9,37 @@ This node is the sole command publisher for:
   /wheel_effort_controller/commands
       [wheel_1, wheel_2] effort, N*m
 
-Architecture
-------------
-1. Four leg motors:
-   Joint-position PD keeps the calibrated symmetric leg configuration.
+Control architecture
+--------------------
+1. W/S request a signed target forward velocity.
+2. The target velocity is filtered with a slew-rate limiter.
+3. A common body-pitch reference is generated from:
+      - velocity-error feedback;
+      - target-velocity feedforward.
+4. The four big-arm joints synchronously create the requested body lean.
+5. The two wheel motors simultaneously:
+      - track the requested velocity;
+      - stabilize body pitch and pitch rate;
+      - optionally receive a direct speed feedforward torque.
+6. When W/S is released, target speed, body lean and wheel torque return
+   smoothly instead of snapping immediately to zero.
 
-2. Motion generation:
-   W/S request a target forward velocity.
-   Velocity error generates a body pitch reference.
-
-3. Drive modes:
-   wheel_balance:
-      Pitch/velocity feedback generates the common wheel effort.
-
-   leg_lean_assist:
-      The four big-arm motors move to a lean posture that should tilt the
-      body and shift the center of mass. Wheel effort is reduced to an assist
-      term so the wheels follow the moving body rather than being the primary
-      drive actuator.
-
-4. Steering:
-   A/D add differential wheel effort.
-
-The controller uses /base_odom for:
-  pitch, pitch_rate, forward velocity, and forward position.
+Important sign calibration
+--------------------------
+The numerical signs depend on the SDF joint axes and the definition of +X.
+Start with the supplied conservative YAML. Then:
+- If W makes the body lean backward, reverse all four leg_lean_jN signs.
+- If W makes both wheels rotate backward, reverse wheel1_sign and wheel2_sign.
+- If the printed pitch sign is opposite to the Gazebo view, reverse pitch_sign.
 
 Safety
 ------
-- Wheel effort is zero until both /joint_states and /base_odom are available.
-- Stale odometry stops the wheels.
-- Stale joint states stop all six efforts.
-- Excessive pitch stops the wheels.
-- SPACE stops motion while keeping leg PD active.
-- Q or Ctrl-C sends zero to all six motors before ROS shutdown.
+- Stale joint states stop all six commanded efforts.
+- Stale odometry disables motion references and wheel effort.
+- Excessive body pitch disables wheel effort.
+- SPACE immediately cancels the motion request and returns the lean reference
+  to zero while leg position holding remains active.
+- Q or Ctrl-C publishes repeated zero commands before shutdown.
 """
 
 from __future__ import annotations
@@ -68,28 +66,28 @@ from std_msgs.msg import Float64MultiArray
 
 
 HELP = """
-Six-motor balance teleoperation
-===============================
+Synchronous six-motor wheel-leg teleoperation
+=============================================
 
 Vehicle:
-  Hold W : request forward velocity
-  Hold S : request backward velocity
+  Hold W : request forward velocity + forward body lean
+  Hold S : request backward velocity + backward body lean
   Hold A : turn left
   Hold D : turn right
-  SPACE  : target speed and turn command -> zero
+  SPACE  : immediately cancel motion command; leg PD stays active
 
 Leg posture:
   R / F  : increase / decrease symmetric leg extension
-  0      : reset leg extension offset
+  0      : reset symmetric leg extension offset
 
 Speed and steering:
   ] / [  : increase / decrease commanded speed magnitude
   = / -  : increase / decrease steering effort
 
 Other:
-  P      : print controller status
+  P      : print configuration
   H      : print help
-  Q      : zero all six motor efforts and quit
+  Q      : zero all motor efforts and quit
 
 Command order:
   legs   = [big_arm_1, big_arm_2, big_arm_3, big_arm_4]
@@ -98,15 +96,18 @@ Command order:
 
 
 def clamp(value: float, low: float, high: float) -> float:
+    """Clamp value to the inclusive interval [low, high]."""
     return max(low, min(high, value))
 
 
 def normalize_sign(value: float) -> float:
+    """Convert any numeric sign parameter to exactly +1.0 or -1.0."""
     return 1.0 if value >= 0.0 else -1.0
 
 
 def sign_or_zero(value: float) -> float:
-    if abs(value) < 1e-9:
+    """Return the sign of value, preserving an exact zero."""
+    if abs(value) < 1.0e-9:
         return 0.0
     return 1.0 if value > 0.0 else -1.0
 
@@ -117,7 +118,7 @@ def quaternion_to_pitch(
     qz: float,
     qw: float,
 ) -> float:
-    """Return pitch in radians using the standard ROS quaternion convention."""
+    """Return ROS-convention pitch in radians from a quaternion."""
     sin_pitch = 2.0 * (qw * qy - qz * qx)
     if abs(sin_pitch) >= 1.0:
         return math.copysign(math.pi / 2.0, sin_pitch)
@@ -125,6 +126,8 @@ def quaternion_to_pitch(
 
 
 class SixMotorBalanceTeleop(Node):
+    """Keyboard teleoperation with synchronized leg-lean and wheel control."""
+
     LEG_JOINTS = [
         'big_arm_1_joint',
         'big_arm_2_joint',
@@ -132,14 +135,16 @@ class SixMotorBalanceTeleop(Node):
         'big_arm_4_joint',
     ]
 
-    # Symmetric extension pattern:
-    # [q1, q2, q3, q4] += offset * [1, -1, 1, -1]
+    # Symmetric leg extension:
+    # [q1, q2, q3, q4] += extension * [1, -1, 1, -1]
     EXTENSION_PATTERN = [1.0, -1.0, 1.0, -1.0]
 
     def __init__(self) -> None:
         super().__init__('six_motor_manual_controller')
 
-        # Topics.
+        # --------------------------------------------------------------
+        # ROS topics
+        # --------------------------------------------------------------
         self.declare_parameter(
             'wheel_command_topic',
             '/wheel_effort_controller/commands',
@@ -151,82 +156,125 @@ class SixMotorBalanceTeleop(Node):
         self.declare_parameter('joint_state_topic', '/joint_states')
         self.declare_parameter('odom_topic', '/base_odom')
 
-        # Timing and safety.
+        # --------------------------------------------------------------
+        # Timing and safety
+        # --------------------------------------------------------------
         self.declare_parameter('publish_rate', 100.0)
         self.declare_parameter('deadman_timeout', 0.70)
         self.declare_parameter('joint_state_timeout', 0.30)
         self.declare_parameter('odom_timeout', 0.30)
         self.declare_parameter('start_delay', 0.50)
-        self.declare_parameter('fall_angle_deg', 20.0)
+        self.declare_parameter('fall_angle_deg', 25.0)
+        self.declare_parameter('status_period', 0.20)
 
-        # Keyboard target-velocity command.
-        self.declare_parameter('command_speed', 0.15)
-        self.declare_parameter('speed_step', 0.05)
-        self.declare_parameter('max_target_speed', 0.50)
-        self.declare_parameter('target_speed_slew_rate', 0.60)
+        # --------------------------------------------------------------
+        # Keyboard target velocity
+        # --------------------------------------------------------------
+        self.declare_parameter('command_speed', 0.08)
+        self.declare_parameter('speed_step', 0.02)
+        self.declare_parameter('max_target_speed', 0.25)
+        self.declare_parameter('target_speed_slew_rate', 0.40)
+        self.declare_parameter('target_speed_epsilon', 0.002)
 
-        # Speed -> pitch reference.
-        self.declare_parameter('speed_to_pitch_gain', 0.80)
-        self.declare_parameter('max_pitch_ref_deg', 6.0)
+        # --------------------------------------------------------------
+        # Target velocity -> body pitch reference
+        #
+        # theta_ref =
+        #   pitch_ref_sign * clamp(
+        #       speed_to_pitch_gain * (v_ref - v)
+        #       + speed_to_pitch_ff_gain * v_ref
+        #   )
+        # --------------------------------------------------------------
+        self.declare_parameter('speed_to_pitch_gain', 0.60)
+        self.declare_parameter('speed_to_pitch_ff_gain', 0.30)
+        self.declare_parameter('max_pitch_ref_deg', 4.0)
         self.declare_parameter('pitch_ref_sign', 1.0)
 
-        # Drive architecture.
+        # --------------------------------------------------------------
+        # Drive architecture
+        # --------------------------------------------------------------
         self.declare_parameter('drive_mode', 'leg_lean_assist')
 
-        # Leg-driven body lean. Positive pitch error adds
-        # leg_lean_gain * (pitch_ref - pitch) * leg_lean_jN to each big-arm
-        # target.
-        self.declare_parameter('leg_lean_gain', 1.0)
-        self.declare_parameter('max_leg_lean_offset', 0.25)
-        self.declare_parameter('leg_lean_j1', 1.0)
+        # --------------------------------------------------------------
+        # Leg-generated body lean
+        #
+        # A persistent feedforward term is required. A pure
+        # (theta_ref - theta) term would return to zero when theta reaches
+        # theta_ref, causing the legs to retract and creating oscillation.
+        #
+        # lean_offset =
+        #   leg_lean_pitch_ff_gain * theta_ref
+        #   + leg_lean_gain * (theta_ref - theta)
+        #   - leg_lean_rate_gain * theta_dot
+        # --------------------------------------------------------------
+        self.declare_parameter('leg_lean_pitch_ff_gain', 0.40)
+        self.declare_parameter('leg_lean_gain', 0.30)
+        self.declare_parameter('leg_lean_rate_gain', 0.02)
+        self.declare_parameter('max_leg_lean_offset', 0.04)
+
+        # For the current closed-loop geometry, start with all four signs
+        # equal. This is different from the symmetric extension pattern.
+        self.declare_parameter('leg_lean_j1', -1.0)
         self.declare_parameter('leg_lean_j2', -1.0)
-        self.declare_parameter('leg_lean_j3', 1.0)
+        self.declare_parameter('leg_lean_j3', -1.0)
         self.declare_parameter('leg_lean_j4', -1.0)
-        self.declare_parameter('pitch_error_deadband_deg', 0.5)
+
+        # Optional direct leg torque feedforward. Keep disabled initially.
+        self.declare_parameter('pitch_error_deadband_deg', 1.0)
         self.declare_parameter('leg_lean_effort_gain', 0.0)
         self.declare_parameter('max_leg_lean_effort', 0.0)
 
-        # Wheel effort used in leg_lean_assist mode.
-        self.declare_parameter('wheel_assist_pitch_kp', 0.5)
-        self.declare_parameter('wheel_assist_pitch_kd', 0.10)
-        self.declare_parameter('wheel_assist_velocity_kd', 0.20)
-        self.declare_parameter('max_wheel_assist_torque', 0.60)
+        # --------------------------------------------------------------
+        # Wheel controller in leg_lean_assist mode
+        #
+        # The pitch/velocity feedback remains active at zero target speed,
+        # allowing the wheels to stabilize the body after W/S is released.
+        # A small direct speed feedforward makes wheel motion start
+        # simultaneously with the leg lean command.
+        # --------------------------------------------------------------
+        self.declare_parameter('wheel_assist_pitch_kp', 0.60)
+        self.declare_parameter('wheel_assist_pitch_kd', 0.12)
+        self.declare_parameter('wheel_assist_velocity_kd', 0.30)
+        self.declare_parameter('wheel_speed_ff_gain', 0.40)
+        self.declare_parameter('max_wheel_assist_torque', 0.40)
 
-        # Balance / velocity feedback.
-        self.declare_parameter('balance_kp', 8.0)
-        self.declare_parameter('balance_kd', 0.8)
-        self.declare_parameter('velocity_kd', 0.5)
+        # Full wheel_balance mode gains.
+        self.declare_parameter('balance_kp', 2.0)
+        self.declare_parameter('balance_kd', 0.10)
+        self.declare_parameter('velocity_kd', 0.30)
         self.declare_parameter('position_hold_kp', 0.0)
+
+        # Direction calibration.
         self.declare_parameter('balance_sign', 1.0)
         self.declare_parameter('pitch_sign', 1.0)
-
-        # Steering and wheel limits.
-        self.declare_parameter('turn_torque', 0.15)
-        self.declare_parameter('turn_torque_step', 0.02)
-        self.declare_parameter('max_turn_torque', 0.50)
-        self.declare_parameter('max_wheel_torque', 1.00)
-        self.declare_parameter('wheel1_sign', 1.0)
-        self.declare_parameter('wheel2_sign', 1.0)
         self.declare_parameter('forward_sign', 1.0)
         self.declare_parameter('turn_sign', 1.0)
+        self.declare_parameter('wheel1_sign', -1.0)
+        self.declare_parameter('wheel2_sign', -1.0)
 
-        # Calibrated leg targets.
+        # Steering and wheel limits.
+        self.declare_parameter('turn_torque', 0.0)
+        self.declare_parameter('turn_torque_step', 0.02)
+        self.declare_parameter('max_turn_torque', 0.15)
+        self.declare_parameter('max_wheel_torque', 0.50)
+
+        # Calibrated base leg targets.
         self.declare_parameter('j1', 0.15)
         self.declare_parameter('j2', -0.15)
         self.declare_parameter('j3', 0.15)
         self.declare_parameter('j4', -0.15)
 
-        # Leg PD.
-        self.declare_parameter('leg_kp', 2.0)
+        # Leg joint PD.
+        self.declare_parameter('leg_kp', 1.0)
         self.declare_parameter('leg_kd', 0.20)
-        self.declare_parameter('max_leg_effort', 3.0)
-        self.declare_parameter('leg_target_slew_rate', 0.30)
+        self.declare_parameter('max_leg_effort', 2.0)
+        self.declare_parameter('leg_target_slew_rate', 0.40)
         self.declare_parameter('leg_extension_step', 0.01)
         self.declare_parameter('max_leg_extension_offset', 0.20)
 
-        # Status output.
-        self.declare_parameter('status_period', 0.20)
-
+        # --------------------------------------------------------------
+        # Resolve parameters used frequently
+        # --------------------------------------------------------------
         self.wheel_topic = str(
             self.get_parameter('wheel_command_topic').value
         )
@@ -266,6 +314,10 @@ class SixMotorBalanceTeleop(Node):
             0.0,
             abs(float(self.get_parameter('max_target_speed').value)),
         )
+        self.target_speed_epsilon = max(
+            0.0,
+            abs(float(self.get_parameter('target_speed_epsilon').value)),
+        )
 
         self.turn_torque = abs(
             float(self.get_parameter('turn_torque').value)
@@ -304,6 +356,7 @@ class SixMotorBalanceTeleop(Node):
         self.pitch_sign = normalize_sign(
             float(self.get_parameter('pitch_sign').value)
         )
+
         self.drive_mode = str(
             self.get_parameter('drive_mode').value
         ).strip().lower()
@@ -329,38 +382,43 @@ class SixMotorBalanceTeleop(Node):
             ),
         )
 
-        # Joint feedback.
+        # --------------------------------------------------------------
+        # Feedback state
+        # --------------------------------------------------------------
         self.leg_position: Dict[str, float] = {}
         self.leg_velocity: Dict[str, float] = {}
         self.last_joint_state_wall_time: Optional[float] = None
 
-        # Odometry / body state.
         self.pitch: Optional[float] = None
         self.pitch_rate: Optional[float] = None
         self.position_x: Optional[float] = None
         self.velocity_x: Optional[float] = None
         self.last_odom_wall_time: Optional[float] = None
 
-        # Automatically captured equilibrium.
         self.pitch0: Optional[float] = None
         self.position_hold_reference: Optional[float] = None
 
-        # Leg target management.
+        # --------------------------------------------------------------
+        # Command state
+        # --------------------------------------------------------------
         self.commanded_leg_targets: Optional[List[float]] = None
         self.leg_extension_offset = 0.0
 
-        # Keyboard and motion command.
         self.motion_key: Optional[str] = None
         self.last_motion_key_wall_time = 0.0
         self.requested_target_speed = 0.0
         self.filtered_target_speed = 0.0
         self.requested_turn_effort = 0.0
 
-        # Runtime.
+        # --------------------------------------------------------------
+        # Runtime diagnostics
+        # --------------------------------------------------------------
         self.quit_requested = False
         self.start_wall_time = time.monotonic()
         self.last_control_wall_time = self.start_wall_time
         self.last_status_wall_time = 0.0
+
+        self.last_speed_error = 0.0
         self.last_pitch_ref = 0.0
         self.last_pitch_error = 0.0
         self.last_drive_effort = 0.0
@@ -368,8 +426,12 @@ class SixMotorBalanceTeleop(Node):
         self.last_leg_lean_effort = 0.0
         self.last_wheel_command = (0.0, 0.0)
         self.last_leg_command = [0.0, 0.0, 0.0, 0.0]
+        self.last_leg_targets = [0.0, 0.0, 0.0, 0.0]
         self.last_safety_reason = 'waiting for feedback'
 
+        # --------------------------------------------------------------
+        # ROS interfaces
+        # --------------------------------------------------------------
         self.wheel_pub = self.create_publisher(
             Float64MultiArray,
             self.wheel_topic,
@@ -421,6 +483,8 @@ class SixMotorBalanceTeleop(Node):
         ):
             self.last_joint_state_wall_time = time.monotonic()
 
+            # Start from the robot's actual joint configuration so that
+            # launching the node does not command an instantaneous jump.
             if self.commanded_leg_targets is None:
                 self.commanded_leg_targets = [
                     self.leg_position[name]
@@ -484,6 +548,160 @@ class SixMotorBalanceTeleop(Node):
             <= self.odom_timeout
         )
 
+    def theta(self) -> float:
+        if self.pitch is None or self.pitch0 is None:
+            return 0.0
+        return self.pitch - self.pitch0
+
+    # ------------------------------------------------------------------
+    # Keyboard command and common motion reference
+    # ------------------------------------------------------------------
+
+    def keyboard_command_alive(self, now: float) -> bool:
+        return (
+            self.motion_key is not None
+            and now - self.last_motion_key_wall_time
+            <= self.deadman_timeout
+        )
+
+    def refresh_keyboard_command(self, now: float) -> None:
+        if not self.keyboard_command_alive(now):
+            self.motion_key = None
+            self.requested_target_speed = 0.0
+            self.requested_turn_effort = 0.0
+            return
+
+        speed = self.forward_sign * self.command_speed
+        turn = self.turn_sign * self.turn_torque
+
+        if self.motion_key == 'w':
+            self.requested_target_speed = speed
+            self.requested_turn_effort = 0.0
+        elif self.motion_key == 's':
+            self.requested_target_speed = -speed
+            self.requested_turn_effort = 0.0
+        elif self.motion_key == 'a':
+            self.requested_target_speed = 0.0
+            self.requested_turn_effort = turn
+        elif self.motion_key == 'd':
+            self.requested_target_speed = 0.0
+            self.requested_turn_effort = -turn
+        else:
+            self.requested_target_speed = 0.0
+            self.requested_turn_effort = 0.0
+
+        self.requested_target_speed = clamp(
+            self.requested_target_speed,
+            -self.max_target_speed,
+            self.max_target_speed,
+        )
+        self.requested_turn_effort = clamp(
+            self.requested_turn_effort,
+            -self.max_turn_torque,
+            self.max_turn_torque,
+        )
+
+    def update_filtered_target_speed(self, dt: float) -> None:
+        """Slew target speed both when starting and when releasing W/S."""
+        slew_rate = max(
+            0.01,
+            abs(
+                float(
+                    self.get_parameter(
+                        'target_speed_slew_rate'
+                    ).value
+                )
+            ),
+        )
+        max_step = slew_rate * max(0.0, dt)
+        error = self.requested_target_speed - self.filtered_target_speed
+        self.filtered_target_speed += clamp(
+            error,
+            -max_step,
+            max_step,
+        )
+
+        if abs(self.filtered_target_speed) <= self.target_speed_epsilon:
+            if abs(self.requested_target_speed) <= self.target_speed_epsilon:
+                self.filtered_target_speed = 0.0
+
+    def translational_motion_active(self) -> bool:
+        return (
+            abs(self.requested_target_speed) > self.target_speed_epsilon
+            or abs(self.filtered_target_speed) > self.target_speed_epsilon
+            or abs(self.last_pitch_ref) > math.radians(0.05)
+        )
+
+    def update_motion_reference(self, now: float, dt: float) -> bool:
+        """Update one shared speed/pitch reference for legs and wheels."""
+        self.refresh_keyboard_command(now)
+        self.update_filtered_target_speed(dt)
+
+        if not self.odom_fresh(now) or not self.odom_ready():
+            self.last_speed_error = 0.0
+            self.last_pitch_ref = 0.0
+            self.last_pitch_error = 0.0
+            self.last_safety_reason = 'waiting for fresh /base_odom'
+            return False
+
+        assert self.pitch_rate is not None
+        assert self.position_x is not None
+        assert self.velocity_x is not None
+
+        theta = self.theta()
+        velocity = self.velocity_x
+
+        fall_angle = math.radians(
+            abs(float(self.get_parameter('fall_angle_deg').value))
+        )
+        if abs(theta) > fall_angle:
+            self.requested_target_speed = 0.0
+            self.filtered_target_speed = 0.0
+            self.last_speed_error = 0.0
+            self.last_pitch_ref = 0.0
+            self.last_pitch_error = -theta
+            self.last_safety_reason = (
+                f'fallen: theta={math.degrees(theta):.1f} deg'
+            )
+            return False
+
+        speed_error = self.filtered_target_speed - velocity
+        self.last_speed_error = speed_error
+
+        max_pitch_ref = math.radians(
+            abs(float(self.get_parameter('max_pitch_ref_deg').value))
+        )
+        speed_to_pitch_gain = float(
+            self.get_parameter('speed_to_pitch_gain').value
+        )
+        speed_to_pitch_ff_gain = float(
+            self.get_parameter('speed_to_pitch_ff_gain').value
+        )
+
+        pitch_command = (
+            speed_to_pitch_gain * speed_error
+            + speed_to_pitch_ff_gain * self.filtered_target_speed
+        )
+        self.last_pitch_ref = self.pitch_ref_sign * clamp(
+            pitch_command,
+            -max_pitch_ref,
+            max_pitch_ref,
+        )
+        self.last_pitch_error = self.last_pitch_ref - theta
+
+        if (
+            abs(self.filtered_target_speed) < self.target_speed_epsilon
+            and self.position_hold_reference is not None
+        ):
+            pass
+        else:
+            # Do not let position hold pull the robot back to its initial
+            # launch position while it is intentionally moving.
+            self.position_hold_reference = self.position_x
+
+        self.last_safety_reason = 'active'
+        return True
+
     # ------------------------------------------------------------------
     # Leg control
     # ------------------------------------------------------------------
@@ -496,56 +714,72 @@ class SixMotorBalanceTeleop(Node):
             float(self.get_parameter('j4').value),
         ]
 
-    def desired_leg_targets(self) -> List[float]:
-        lean_offset = 0.0
-        if (
-            self.drive_mode == 'leg_lean_assist'
-            and self.forward_motion_active()
-        ):
-            lean_gain = float(self.get_parameter('leg_lean_gain').value)
-            max_lean_offset = max(
-                0.0,
-                abs(float(self.get_parameter('max_leg_lean_offset').value)),
-            )
-
-            theta = 0.0
-            if self.pitch is not None and self.pitch0 is not None:
-                theta = self.pitch - self.pitch0
-
-            pitch_error = self.last_pitch_ref - theta
-            lean_offset = clamp(
-                lean_gain * pitch_error,
-                -max_lean_offset,
-                max_lean_offset,
-            )
-            self.last_pitch_error = pitch_error
-        else:
-            self.last_pitch_error = 0.0
-
-        lean_pattern = [
+    def lean_pattern(self) -> List[float]:
+        return [
             float(self.get_parameter('leg_lean_j1').value),
             float(self.get_parameter('leg_lean_j2').value),
             float(self.get_parameter('leg_lean_j3').value),
             float(self.get_parameter('leg_lean_j4').value),
         ]
-        self.last_leg_lean_offset = lean_offset
 
-        return [
+    def desired_leg_targets(self) -> List[float]:
+        lean_offset = 0.0
+
+        if (
+            self.drive_mode == 'leg_lean_assist'
+            and self.odom_ready()
+            and self.translational_motion_active()
+        ):
+            theta = self.theta()
+            theta_dot = float(self.pitch_rate or 0.0)
+            pitch_error = self.last_pitch_ref - theta
+
+            pitch_ff_gain = float(
+                self.get_parameter('leg_lean_pitch_ff_gain').value
+            )
+            pitch_feedback_gain = float(
+                self.get_parameter('leg_lean_gain').value
+            )
+            pitch_rate_gain = float(
+                self.get_parameter('leg_lean_rate_gain').value
+            )
+            max_lean_offset = max(
+                0.0,
+                abs(float(self.get_parameter('max_leg_lean_offset').value)),
+            )
+
+            lean_offset = clamp(
+                pitch_ff_gain * self.last_pitch_ref
+                + pitch_feedback_gain * pitch_error
+                - pitch_rate_gain * theta_dot,
+                -max_lean_offset,
+                max_lean_offset,
+            )
+            self.last_pitch_error = pitch_error
+
+        self.last_leg_lean_offset = lean_offset
+        pattern = self.lean_pattern()
+
+        targets = [
             base
             + extension_pattern * self.leg_extension_offset
             + lean_pattern_value * lean_offset
             for base, extension_pattern, lean_pattern_value in zip(
                 self.base_leg_targets(),
                 self.EXTENSION_PATTERN,
-                lean_pattern,
+                pattern,
             )
         ]
+        self.last_leg_targets = targets
+        return targets
 
     def calculate_leg_lean_feedforward_efforts(self) -> List[float]:
+        """Optional direct torque feedforward; disabled by default."""
         self.last_leg_lean_effort = 0.0
+
         if (
             self.drive_mode != 'leg_lean_assist'
-            or not self.forward_motion_active()
+            or not self.translational_motion_active()
         ):
             return [0.0, 0.0, 0.0, 0.0]
 
@@ -571,15 +805,9 @@ class SixMotorBalanceTeleop(Node):
         )
         self.last_leg_lean_effort = effort
 
-        lean_pattern = [
-            float(self.get_parameter('leg_lean_j1').value),
-            float(self.get_parameter('leg_lean_j2').value),
-            float(self.get_parameter('leg_lean_j3').value),
-            float(self.get_parameter('leg_lean_j4').value),
-        ]
         return [
             sign_or_zero(pattern_value) * effort
-            for pattern_value in lean_pattern
+            for pattern_value in self.lean_pattern()
         ]
 
     def update_commanded_leg_targets(self, dt: float) -> None:
@@ -635,14 +863,12 @@ class SixMotorBalanceTeleop(Node):
             0.0,
             abs(float(self.get_parameter('max_leg_effort').value)),
         )
-
         lean_feedforward = self.calculate_leg_lean_feedforward_efforts()
 
         efforts: List[float] = []
-        for index, (name, target) in enumerate(zip(
-            self.LEG_JOINTS,
-            self.commanded_leg_targets,
-        )):
+        for index, (name, target) in enumerate(
+            zip(self.LEG_JOINTS, self.commanded_leg_targets)
+        ):
             position = self.leg_position[name]
             velocity = self.leg_velocity.get(name, 0.0)
 
@@ -658,159 +884,39 @@ class SixMotorBalanceTeleop(Node):
         return efforts
 
     # ------------------------------------------------------------------
-    # Motion command and balance control
+    # Wheel control
     # ------------------------------------------------------------------
-
-    def forward_motion_active(self) -> bool:
-        return self.motion_key in ('w', 's')
-
-    def refresh_keyboard_command(self, now: float) -> None:
-        if (
-            self.motion_key is None
-            or now - self.last_motion_key_wall_time
-            > self.deadman_timeout
-        ):
-            self.motion_key = None
-            self.requested_target_speed = 0.0
-            self.requested_turn_effort = 0.0
-            return
-
-        speed = self.forward_sign * self.command_speed
-        turn = self.turn_sign * self.turn_torque
-
-        if self.motion_key == 'w':
-            self.requested_target_speed = speed
-            self.requested_turn_effort = 0.0
-        elif self.motion_key == 's':
-            self.requested_target_speed = -speed
-            self.requested_turn_effort = 0.0
-        elif self.motion_key == 'a':
-            self.requested_target_speed = 0.0
-            self.requested_turn_effort = turn
-        elif self.motion_key == 'd':
-            self.requested_target_speed = 0.0
-            self.requested_turn_effort = -turn
-        else:
-            self.requested_target_speed = 0.0
-            self.requested_turn_effort = 0.0
-
-        self.requested_target_speed = clamp(
-            self.requested_target_speed,
-            -self.max_target_speed,
-            self.max_target_speed,
-        )
-        self.requested_turn_effort = clamp(
-            self.requested_turn_effort,
-            -self.max_turn_torque,
-            self.max_turn_torque,
-        )
-
-    def update_filtered_target_speed(self, dt: float) -> None:
-        slew_rate = max(
-            0.01,
-            abs(
-                float(
-                    self.get_parameter(
-                        'target_speed_slew_rate'
-                    ).value
-                )
-            ),
-        )
-        max_step = slew_rate * max(0.0, dt)
-        error = (
-            self.requested_target_speed
-            - self.filtered_target_speed
-        )
-        self.filtered_target_speed += clamp(
-            error,
-            -max_step,
-            max_step,
-        )
 
     def calculate_wheel_efforts(
         self,
         now: float,
-        dt: float,
     ) -> Tuple[float, float]:
-        self.refresh_keyboard_command(now)
-        if self.forward_motion_active():
-            self.update_filtered_target_speed(dt)
-        else:
-            self.filtered_target_speed = 0.0
-            self.last_pitch_ref = 0.0
-
         if not self.odom_fresh(now) or not self.odom_ready():
-            self.last_safety_reason = 'waiting for fresh /base_odom'
             return 0.0, 0.0
 
-        assert self.pitch is not None
+        if self.last_safety_reason.startswith('fallen'):
+            return 0.0, 0.0
+
         assert self.pitch_rate is not None
         assert self.position_x is not None
         assert self.velocity_x is not None
-        assert self.pitch0 is not None
 
-        theta = self.pitch - self.pitch0
+        theta = self.theta()
         theta_dot = self.pitch_rate
         velocity = self.velocity_x
-
-        fall_angle = math.radians(
-            abs(float(self.get_parameter('fall_angle_deg').value))
-        )
-        if abs(theta) > fall_angle:
-            self.last_safety_reason = (
-                f'fallen: theta={math.degrees(theta):.1f} deg'
-            )
-            self.filtered_target_speed = 0.0
-            return 0.0, 0.0
-
-        speed_error = 0.0
-        if self.forward_motion_active():
-            speed_error = self.filtered_target_speed - velocity
-
-        max_pitch_ref = math.radians(
-            abs(
-                float(
-                    self.get_parameter(
-                        'max_pitch_ref_deg'
-                    ).value
-                )
-            )
-        )
-        speed_to_pitch_gain = float(
-            self.get_parameter('speed_to_pitch_gain').value
-        )
-
-        pitch_ref = self.pitch_ref_sign * clamp(
-            speed_to_pitch_gain * speed_error,
-            -max_pitch_ref,
-            max_pitch_ref,
-        )
-
-        balance_kp = float(
-            self.get_parameter('balance_kp').value
-        )
-        balance_kd = float(
-            self.get_parameter('balance_kd').value
-        )
-        velocity_kd = float(
-            self.get_parameter('velocity_kd').value
-        )
-        position_hold_kp = float(
-            self.get_parameter('position_hold_kp').value
-        )
+        pitch_ref = self.last_pitch_ref
+        velocity_ref = self.filtered_target_speed
 
         position_error = 0.0
         if (
-            abs(self.filtered_target_speed) < 1e-3
+            abs(velocity_ref) < self.target_speed_epsilon
             and self.position_hold_reference is not None
         ):
-            position_error = (
-                self.position_x - self.position_hold_reference
-            )
-        else:
-            # While moving, continually move the stationary hold reference
-            # along with the robot to avoid pulling it back to the start.
-            self.position_hold_reference = self.position_x
+            position_error = self.position_x - self.position_hold_reference
+
+        wheel_speed_ff_gain = float(
+            self.get_parameter('wheel_speed_ff_gain').value
+        )
 
         if self.drive_mode == 'leg_lean_assist':
             assist_pitch_kp = float(
@@ -821,6 +927,9 @@ class SixMotorBalanceTeleop(Node):
             )
             assist_velocity_kd = float(
                 self.get_parameter('wheel_assist_velocity_kd').value
+            )
+            position_hold_kp = float(
+                self.get_parameter('position_hold_kp').value
             )
             assist_limit = max(
                 0.0,
@@ -833,27 +942,41 @@ class SixMotorBalanceTeleop(Node):
                 ),
             )
 
-            if self.forward_motion_active():
-                raw_drive_effort = self.balance_sign * (
-                    assist_pitch_kp * (theta - pitch_ref)
-                    + assist_pitch_kd * theta_dot
-                    + assist_velocity_kd
-                    * (velocity - self.filtered_target_speed)
-                )
-            else:
-                raw_drive_effort = 0.0
+            feedback_effort = self.balance_sign * (
+                assist_pitch_kp * (theta - pitch_ref)
+                + assist_pitch_kd * theta_dot
+                + assist_velocity_kd * (velocity - velocity_ref)
+                + position_hold_kp * position_error
+            )
+            feedforward_effort = wheel_speed_ff_gain * velocity_ref
+            raw_drive_effort = feedback_effort + feedforward_effort
             raw_drive_effort = clamp(
                 raw_drive_effort,
                 -assist_limit,
                 assist_limit,
             )
         else:
-            raw_drive_effort = self.balance_sign * (
+            balance_kp = float(
+                self.get_parameter('balance_kp').value
+            )
+            balance_kd = float(
+                self.get_parameter('balance_kd').value
+            )
+            velocity_kd = float(
+                self.get_parameter('velocity_kd').value
+            )
+            position_hold_kp = float(
+                self.get_parameter('position_hold_kp').value
+            )
+
+            feedback_effort = self.balance_sign * (
                 balance_kp * (theta - pitch_ref)
                 + balance_kd * theta_dot
-                + velocity_kd * (velocity - self.filtered_target_speed)
+                + velocity_kd * (velocity - velocity_ref)
                 + position_hold_kp * position_error
             )
+            feedforward_effort = wheel_speed_ff_gain * velocity_ref
+            raw_drive_effort = feedback_effort + feedforward_effort
 
         turn_effort = self.requested_turn_effort
         wheel1 = raw_drive_effort + turn_effort
@@ -873,13 +996,11 @@ class SixMotorBalanceTeleop(Node):
             self.max_wheel_torque,
         )
 
-        self.last_pitch_ref = pitch_ref
         self.last_drive_effort = raw_drive_effort
-        self.last_safety_reason = 'active'
         return wheel1, wheel2
 
     # ------------------------------------------------------------------
-    # Publishing and loop
+    # Publishing and main loop
     # ------------------------------------------------------------------
 
     def publish_wheels(
@@ -920,8 +1041,12 @@ class SixMotorBalanceTeleop(Node):
             self.print_runtime_status(now)
             return
 
-        wheel_efforts = self.calculate_wheel_efforts(now, dt)
+        # One shared motion reference is calculated before either actuator
+        # group, guaranteeing synchronous leg and wheel control.
+        self.update_motion_reference(now, dt)
+
         leg_efforts = self.calculate_leg_efforts(now, dt)
+        wheel_efforts = self.calculate_wheel_efforts(now)
 
         self.publish_legs(leg_efforts)
         self.publish_wheels(wheel_efforts)
@@ -936,25 +1061,24 @@ class SixMotorBalanceTeleop(Node):
             return
         self.last_status_wall_time = now
 
-        theta_deg = float('nan')
+        theta_deg = math.degrees(self.theta())
         pitch_ref_deg = math.degrees(self.last_pitch_ref)
-        velocity = float('nan')
-
-        if self.pitch is not None and self.pitch0 is not None:
-            theta_deg = math.degrees(self.pitch - self.pitch0)
-        if self.velocity_x is not None:
-            velocity = self.velocity_x
+        velocity = (
+            float(self.velocity_x)
+            if self.velocity_x is not None
+            else float('nan')
+        )
 
         print(
             '\r'
             f'mode={(self.motion_key or "STOP").upper():>4s} | '
-            f'v_ref={self.filtered_target_speed:+.3f} m/s | '
+            f'v_cmd={self.requested_target_speed:+.3f} | '
+            f'v_ref={self.filtered_target_speed:+.3f} | '
             f'v={velocity:+.3f} m/s | '
             f'theta={theta_deg:+.2f} deg | '
             f'theta_ref={pitch_ref_deg:+.2f} deg | '
             f'theta_err={math.degrees(self.last_pitch_error):+.2f} deg | '
-            f'lean={self.last_leg_lean_offset:+.3f} rad | '
-            f'lean_ff={self.last_leg_lean_effort:+.3f} N*m | '
+            f'lean={self.last_leg_lean_offset:+.4f} rad | '
             f'wheel=[{self.last_wheel_command[0]:+.3f}, '
             f'{self.last_wheel_command[1]:+.3f}] N*m | '
             f'{self.last_safety_reason}      ',
@@ -967,14 +1091,18 @@ class SixMotorBalanceTeleop(Node):
     # ------------------------------------------------------------------
 
     def stop_motion(self) -> None:
+        """Immediate commanded stop used by SPACE."""
         self.motion_key = None
         self.requested_target_speed = 0.0
         self.filtered_target_speed = 0.0
         self.requested_turn_effort = 0.0
         self.last_pitch_ref = 0.0
-        self.last_pitch_error = 0.0
+        self.last_pitch_error = -self.theta()
         self.last_leg_lean_offset = 0.0
         self.last_leg_lean_effort = 0.0
+
+        if self.position_x is not None:
+            self.position_hold_reference = self.position_x
 
     def adjust_leg_extension(self, direction: float) -> None:
         self.leg_extension_offset = clamp(
@@ -1063,17 +1191,23 @@ class SixMotorBalanceTeleop(Node):
             f'turn={self.turn_torque:.3f} N*m, '
             f'drive_mode={self.drive_mode}, '
             f'leg_offset={self.leg_extension_offset:+.3f} rad, '
-            f'lean_offset={self.last_leg_lean_offset:+.3f} rad, '
+            f'lean_offset={self.last_leg_lean_offset:+.4f} rad, '
             'leg_targets=['
             + ', '.join(f'{value:+.3f}' for value in targets)
             + '], '
             f'balance_sign={self.balance_sign:+.0f}, '
             f'pitch_ref_sign={self.pitch_ref_sign:+.0f}, '
+            f'pitch_sign={self.pitch_sign:+.0f}, '
             f'wheel_signs=[{self.wheel1_sign:+.0f}, '
             f'{self.wheel2_sign:+.0f}]'
         )
 
     def run(self) -> None:
+        if not sys.stdin.isatty():
+            raise RuntimeError(
+                'Keyboard controller requires an interactive terminal.'
+            )
+
         old_settings = termios.tcgetattr(sys.stdin)
 
         try:
@@ -1113,30 +1247,12 @@ class SixMotorBalanceTeleop(Node):
             print()
 
 
-
 PACKAGE_NAME = 'wheel_leg_description'
 DEFAULT_PARAMS_FILENAME = 'six_motor_manual_controller.yaml'
 
 
 def find_default_params_file() -> Path:
-    """Locate the controller YAML, preferring the source workspace copy.
-
-    Search order:
-      1. Source package beside this script (normal symlink-install).
-      2. Source workspace inferred from the installed package prefix.
-      3. ROS 2 package share directory.
-      4. Install prefix inferred directly from this script.
-
-    Preferring the source YAML means the usual development workflow is:
-      edit src/wheel_leg_description/config/*.yaml
-      ros2 run wheel_leg_description six_motor_manual_controller.py
-
-    No rebuild is needed for parameter-only changes when the source file can
-    be located. The installed share copy remains a safe fallback.
-
-    Raises:
-        FileNotFoundError: if no usable YAML file can be located.
-    """
+    """Locate YAML, preferring the source-workspace copy."""
     candidates: List[Path] = []
     resolved_script = Path(__file__).resolve()
 
@@ -1216,7 +1332,6 @@ def find_default_params_file() -> Path:
 
 
 def contains_params_file(arguments: Sequence[str]) -> bool:
-    """Return True when the user already supplied a params file."""
     return any(
         argument == '--params-file'
         or argument.startswith('--params-file=')
@@ -1228,12 +1343,6 @@ def add_default_params_file(
     arguments: Sequence[str],
     params_file: Path,
 ) -> List[str]:
-    """Add the default YAML before user -p overrides.
-
-    When the user already provides --params-file, their file is used
-    unchanged. Otherwise the package YAML is inserted immediately after
-    --ros-args so any later command-line -p values retain higher priority.
-    """
     effective_arguments = list(arguments)
 
     if contains_params_file(effective_arguments):
@@ -1249,10 +1358,8 @@ def add_default_params_file(
 
     return effective_arguments
 
+
 def main(args=None) -> None:
-    # Automatically load the package YAML when ros2 run is used without
-    # an explicit --params-file. Explicit command-line -p overrides remain
-    # higher priority because the YAML is inserted before user ROS arguments.
     original_arguments = (
         list(sys.argv)
         if args is None
@@ -1280,8 +1387,6 @@ def main(args=None) -> None:
             f'  {default_params_file}'
         )
 
-    # Keep the ROS context alive after Ctrl-C until final zero commands
-    # have been published.
     rclpy.init(
         args=effective_arguments,
         signal_handler_options=SignalHandlerOptions.NO,

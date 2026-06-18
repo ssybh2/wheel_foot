@@ -1,81 +1,20 @@
 six_motor_manual_controller:
   ros__parameters:
-    # Topics
-    wheel_command_topic: /wheel_effort_controller/commands
-    leg_command_topic: /leg_effort_controller/commands
-    joint_state_topic: /joint_states
-    odom_topic: /base_odom
-
-    # Timing and safety
     publish_rate: 100.0
     deadman_timeout: 0.70
     joint_state_timeout: 0.30
-    odom_timeout: 0.30
-    start_delay: 0.50
-    fall_angle_deg: 35.0
-    status_period: 0.20
 
-    # W/S target velocity
-    command_speed: 0.15
-    speed_step: 0.05
-    max_target_speed: 0.50
-    target_speed_slew_rate: 2.0
-
-    # Velocity error -> body pitch reference
-    speed_to_pitch_gain: 4.2
-    max_pitch_ref_deg: 12.0
-    pitch_ref_sign: 1.0
-
-    # Drive architecture:
-    #   leg_lean_assist: big-arm joints create body lean; wheels assist.
-    #   wheel_balance: old mode, wheels are the main pitch/velocity actuator.
-    drive_mode: leg_lean_assist
-
-    # Leg-driven body lean. Positive pitch error adds
-    # leg_lean_gain * (theta_ref - theta) * leg_lean_jN to each big-arm
-    # target. Tune the pattern signs if theta moves away from theta_ref.
-    leg_lean_gain: 1.0
-    max_leg_lean_offset: 0.25
-    leg_lean_j1: -1.0
-    leg_lean_j2: 1.0
-    leg_lean_j3: -1.0
-    leg_lean_j4: 1.0
-    pitch_error_deadband_deg: 0.8
-    leg_lean_effort_gain: 12.0
-    max_leg_lean_effort: 3.0
-
-    # Wheel assist in leg_lean_assist mode. Keep these lower than the
-    # wheel_balance gains so wheels follow the lean instead of dragging.
-    wheel_assist_pitch_kp: 0.4
-    wheel_assist_pitch_kd: 0.08
-    wheel_assist_velocity_kd: 0.12
-    max_wheel_assist_torque: 1.2
-
-    # Pitch and velocity feedback for wheel_balance mode
-    balance_kp: 2.0
-    balance_kd: 0.05
-    velocity_kd: 0.30
-
-    # Keep zero for the first moving tests. Increasing this later adds
-    # stationary position hold and can pull the robot back if tuned badly.
-    position_hold_kp: 0.0
+    # Wheel effort commands, N*m per wheel
+    drive_torque: 0.10
+    turn_torque: 0.08
+    wheel_torque_step: 0.02
+    max_wheel_torque: 0.50
 
     # Direction calibration
-    balance_sign: 1.0
-    pitch_sign: 1.0
+    wheel1_sign: 1.0
+    wheel2_sign: 1.0
     forward_sign: 1.0
     turn_sign: 1.0
-    wheel1_sign: -1.0
-    wheel2_sign: -1.0
-
-    # Steering and wheel effort limits
-    turn_torque: 0.0
-    turn_torque_step: 0.02
-    max_turn_torque: 0.0
-
-    # SDF wheel effort interface is limited to +/-3 N*m.
-    # Start conservatively; raise only after control signs are confirmed.
-    max_wheel_torque: 3.00
 
     # Calibrated leg targets, rad
     j1: 0.15
@@ -83,12 +22,13 @@ six_motor_manual_controller:
     j3: 0.15
     j4: -0.15
 
-    # Four leg joint PD
+    # Leg PD
     leg_kp: 0.5
-    leg_kd: 0.03
-    max_leg_effort: 10.0
+    leg_kd: 0.05
+    max_leg_effort: 2.0
 
     # Smooth leg target management
-    leg_target_slew_rate: 6.0
+    start_delay: 0.50
+    leg_target_slew_rate: 0.30
     leg_extension_step: 0.01
     max_leg_extension_offset: 0.20
