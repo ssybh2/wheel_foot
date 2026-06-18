@@ -1,34 +1,99 @@
 six_motor_manual_controller:
   ros__parameters:
+    # Topics
+    wheel_command_topic: /wheel_effort_controller/commands
+    leg_command_topic: /leg_effort_controller/commands
+    joint_state_topic: /joint_states
+    odom_topic: /base_odom
+
+    # Timing and safety
     publish_rate: 100.0
     deadman_timeout: 0.70
     joint_state_timeout: 0.30
+    odom_timeout: 0.30
+    start_delay: 0.50
+    fall_angle_deg: 25.0
+    status_period: 0.20
 
-    # Wheel effort commands, N*m per wheel
-    drive_torque: 0.10
-    turn_torque: 0.08
-    wheel_torque_step: 0.02
-    max_wheel_torque: 0.50
+    # W/S target vehicle speed
+    command_speed: 0.08
+    speed_step: 0.02
+    max_target_speed: 0.25
+    target_speed_slew_rate: 0.40
+    target_speed_epsilon: 0.002
+
+    # Vehicle-speed reference -> body-pitch reference
+    speed_to_pitch_gain: 0.60
+    speed_to_pitch_ff_gain: 0.30
+    max_pitch_ref_deg: 4.0
+    pitch_ref_sign: 1.0
+
+    # Synchronous leg lean + wheel drive
+    drive_mode: leg_lean_assist
+
+    # Leg-generated pitch
+    leg_lean_pitch_ff_gain: 0.40
+    leg_lean_gain: 0.30
+    leg_lean_rate_gain: 0.02
+    max_leg_lean_offset: 0.04
+
+    # Initial geometry candidate: all four signs equal.
+    leg_lean_j1: -1.0
+    leg_lean_j2: -1.0
+    leg_lean_j3: -1.0
+    leg_lean_j4: -1.0
+
+    # Keep direct leg-torque feedforward disabled initially.
+    pitch_error_deadband_deg: 1.0
+    leg_lean_effort_gain: 0.0
+    max_leg_lean_effort: 0.0
+
+    # Wheel control in leg_lean_assist mode.
+    #
+    # With the corrected code all terms use:
+    #   pitch_ref - theta
+    #   velocity_ref - velocity
+    # so feedback and feedforward reinforce rather than cancel.
+    wheel_assist_pitch_kp: 0.40
+    wheel_assist_pitch_kd: 0.12
+    wheel_assist_velocity_kd: 0.60
+    wheel_speed_ff_gain: 1.00
+    max_wheel_assist_torque: 0.30
+
+    # wheel_balance mode
+    balance_kp: 2.0
+    balance_kd: 0.10
+    velocity_kd: 0.60
+    position_hold_kp: 0.0
 
     # Direction calibration
-    wheel1_sign: 1.0
-    wheel2_sign: 1.0
+    balance_sign: 1.0
+    pitch_sign: 1.0
     forward_sign: 1.0
     turn_sign: 1.0
 
-    # Calibrated leg targets, rad
+    # Start with command-space signs unchanged:
+    # W -> positive wheel command, S -> negative wheel command.
+    # Flip both together only if Gazebo moves in the opposite direction.
+    wheel1_sign: 1.0
+    wheel2_sign: 1.0
+
+    # Steering and torque limits
+    turn_torque: 0.0
+    turn_torque_step: 0.02
+    max_turn_torque: 0.15
+    max_wheel_torque: 0.50
+
+    # Base leg posture
     j1: 0.15
     j2: -0.15
     j3: 0.15
     j4: -0.15
 
     # Leg PD
-    leg_kp: 0.5
-    leg_kd: 0.05
+    leg_kp: 1.0
+    leg_kd: 0.20
     max_leg_effort: 2.0
-
-    # Smooth leg target management
-    start_delay: 0.50
-    leg_target_slew_rate: 0.30
+    leg_target_slew_rate: 0.40
     leg_extension_step: 0.01
     max_leg_extension_offset: 0.20

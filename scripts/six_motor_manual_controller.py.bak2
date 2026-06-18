@@ -232,11 +232,11 @@ class SixMotorBalanceTeleop(Node):
         # A small direct speed feedforward makes wheel motion start
         # simultaneously with the leg lean command.
         # --------------------------------------------------------------
-        self.declare_parameter('wheel_assist_pitch_kp', 0.40)
+        self.declare_parameter('wheel_assist_pitch_kp', 0.60)
         self.declare_parameter('wheel_assist_pitch_kd', 0.12)
-        self.declare_parameter('wheel_assist_velocity_kd', 0.60)
-        self.declare_parameter('wheel_speed_ff_gain', 1.00)
-        self.declare_parameter('max_wheel_assist_torque', 0.30)
+        self.declare_parameter('wheel_assist_velocity_kd', 0.30)
+        self.declare_parameter('wheel_speed_ff_gain', 0.40)
+        self.declare_parameter('max_wheel_assist_torque', 0.40)
 
         # Full wheel_balance mode gains.
         self.declare_parameter('balance_kp', 2.0)
@@ -249,8 +249,8 @@ class SixMotorBalanceTeleop(Node):
         self.declare_parameter('pitch_sign', 1.0)
         self.declare_parameter('forward_sign', 1.0)
         self.declare_parameter('turn_sign', 1.0)
-        self.declare_parameter('wheel1_sign', 1.0)
-        self.declare_parameter('wheel2_sign', 1.0)
+        self.declare_parameter('wheel1_sign', -1.0)
+        self.declare_parameter('wheel2_sign', -1.0)
 
         # Steering and wheel limits.
         self.declare_parameter('turn_torque', 0.0)
@@ -942,21 +942,14 @@ class SixMotorBalanceTeleop(Node):
                 ),
             )
 
-            # All wheel-control terms now use the same error convention:
-            #   positive command -> positive desired vehicle motion.
-            #
-            # The previous implementation used:
-            #   (theta - pitch_ref), (velocity - velocity_ref)
-            # but added +wheel_speed_ff_gain * velocity_ref.
-            # Those terms opposed each other and nearly cancelled.
-            control_effort = (
-                assist_pitch_kp * (pitch_ref - theta)
-                - assist_pitch_kd * theta_dot
-                + assist_velocity_kd * (velocity_ref - velocity)
-                - position_hold_kp * position_error
-                + wheel_speed_ff_gain * velocity_ref
+            feedback_effort = self.balance_sign * (
+                assist_pitch_kp * (theta - pitch_ref)
+                + assist_pitch_kd * theta_dot
+                + assist_velocity_kd * (velocity - velocity_ref)
+                + position_hold_kp * position_error
             )
-            raw_drive_effort = self.balance_sign * control_effort
+            feedforward_effort = wheel_speed_ff_gain * velocity_ref
+            raw_drive_effort = feedback_effort + feedforward_effort
             raw_drive_effort = clamp(
                 raw_drive_effort,
                 -assist_limit,
@@ -976,14 +969,14 @@ class SixMotorBalanceTeleop(Node):
                 self.get_parameter('position_hold_kp').value
             )
 
-            control_effort = (
-                balance_kp * (pitch_ref - theta)
-                - balance_kd * theta_dot
-                + velocity_kd * (velocity_ref - velocity)
-                - position_hold_kp * position_error
-                + wheel_speed_ff_gain * velocity_ref
+            feedback_effort = self.balance_sign * (
+                balance_kp * (theta - pitch_ref)
+                + balance_kd * theta_dot
+                + velocity_kd * (velocity - velocity_ref)
+                + position_hold_kp * position_error
             )
-            raw_drive_effort = self.balance_sign * control_effort
+            feedforward_effort = wheel_speed_ff_gain * velocity_ref
+            raw_drive_effort = feedback_effort + feedforward_effort
 
         turn_effort = self.requested_turn_effort
         wheel1 = raw_drive_effort + turn_effort
