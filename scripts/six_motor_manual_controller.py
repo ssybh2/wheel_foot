@@ -211,6 +211,14 @@ class SixMotorBalanceTeleop(Node):
         self.declare_parameter('leg_lean_gain', 0.30)
         self.declare_parameter('leg_lean_rate_gain', 0.02)
         self.declare_parameter('max_leg_lean_offset', 0.04)
+        self.declare_parameter('stand_pitch_hold_enabled', True)
+        self.declare_parameter('stand_pitch_deadband_deg', 0.3)
+        self.declare_parameter('stand_lean_gain', 0.20)
+        self.declare_parameter('stand_lean_rate_gain', 0.02)
+        self.declare_parameter('max_stand_lean_offset', 0.03)
+        self.declare_parameter('stand_lean_effort_gain', 8.0)
+        self.declare_parameter('stand_lean_effort_rate_gain', 0.15)
+        self.declare_parameter('max_stand_lean_effort', 0.80)
 
         # For the current closed-loop geometry, start with all four signs
         # equal. This is different from the symmetric extension pattern.
@@ -219,7 +227,7 @@ class SixMotorBalanceTeleop(Node):
         self.declare_parameter('leg_lean_j3', -1.0)
         self.declare_parameter('leg_lean_j4', -1.0)
 
-        # Optional direct leg torque feedforward. Keep disabled initially.
+        # Optional direct leg torque feedforward while moving.
         self.declare_parameter('pitch_error_deadband_deg', 1.0)
         self.declare_parameter('leg_lean_effort_gain', 0.0)
         self.declare_parameter('max_leg_lean_effort', 0.0)
@@ -757,6 +765,55 @@ class SixMotorBalanceTeleop(Node):
             )
             self.last_pitch_error = pitch_error
 
+        elif (
+            self.drive_mode == 'leg_lean_assist'
+            and self.odom_ready()
+            and bool(self.get_parameter('stand_pitch_hold_enabled').value)
+        ):
+            theta = self.theta()
+            theta_dot = float(self.pitch_rate or 0.0)
+            pitch_error = -theta
+            deadband = math.radians(
+                abs(
+                    float(
+                        self.get_parameter(
+                            'stand_pitch_deadband_deg'
+                        ).value
+                    )
+                )
+            )
+
+            active_error = 0.0
+            if abs(pitch_error) > deadband:
+                active_error = (
+                    pitch_error - math.copysign(deadband, pitch_error)
+                )
+
+            stand_lean_gain = float(
+                self.get_parameter('stand_lean_gain').value
+            )
+            stand_rate_gain = float(
+                self.get_parameter('stand_lean_rate_gain').value
+            )
+            max_stand_lean_offset = max(
+                0.0,
+                abs(
+                    float(
+                        self.get_parameter(
+                            'max_stand_lean_offset'
+                        ).value
+                    )
+                ),
+            )
+
+            lean_offset = clamp(
+                stand_lean_gain * active_error
+                - stand_rate_gain * theta_dot,
+                -max_stand_lean_offset,
+                max_stand_lean_offset,
+            )
+            self.last_pitch_error = pitch_error
+
         self.last_leg_lean_offset = lean_offset
         pattern = self.lean_pattern()
 
@@ -774,32 +831,72 @@ class SixMotorBalanceTeleop(Node):
         return targets
 
     def calculate_leg_lean_feedforward_efforts(self) -> List[float]:
-        """Optional direct torque feedforward; disabled by default."""
+        """Optional direct pitch-correction torque around the lean pattern."""
         self.last_leg_lean_effort = 0.0
 
-        if (
-            self.drive_mode != 'leg_lean_assist'
-            or not self.translational_motion_active()
-        ):
+        if self.drive_mode != 'leg_lean_assist' or not self.odom_ready():
             return [0.0, 0.0, 0.0, 0.0]
 
-        deadband = math.radians(
-            abs(float(self.get_parameter('pitch_error_deadband_deg').value))
-        )
-        pitch_error = self.last_pitch_error
+        if self.translational_motion_active():
+            deadband = math.radians(
+                abs(
+                    float(
+                        self.get_parameter(
+                            'pitch_error_deadband_deg'
+                        ).value
+                    )
+                )
+            )
+            pitch_error = self.last_pitch_error
+            rate_error = 0.0
+            effort_gain = float(
+                self.get_parameter('leg_lean_effort_gain').value
+            )
+            effort_limit = max(
+                0.0,
+                abs(float(self.get_parameter('max_leg_lean_effort').value)),
+            )
+        elif bool(self.get_parameter('stand_pitch_hold_enabled').value):
+            deadband = math.radians(
+                abs(
+                    float(
+                        self.get_parameter(
+                            'stand_pitch_deadband_deg'
+                        ).value
+                    )
+                )
+            )
+            pitch_error = -self.theta()
+            rate_error = -float(self.pitch_rate or 0.0)
+            effort_gain = float(
+                self.get_parameter('stand_lean_effort_gain').value
+            )
+            effort_rate_gain = float(
+                self.get_parameter('stand_lean_effort_rate_gain').value
+            )
+            effort_limit = max(
+                0.0,
+                abs(
+                    float(
+                        self.get_parameter(
+                            'max_stand_lean_effort'
+                        ).value
+                    )
+                ),
+            )
+        else:
+            return [0.0, 0.0, 0.0, 0.0]
+
         if abs(pitch_error) <= deadband:
             return [0.0, 0.0, 0.0, 0.0]
 
+        if self.translational_motion_active():
+            effort_rate_gain = 0.0
+
         active_error = pitch_error - math.copysign(deadband, pitch_error)
-        effort_gain = float(
-            self.get_parameter('leg_lean_effort_gain').value
-        )
-        effort_limit = max(
-            0.0,
-            abs(float(self.get_parameter('max_leg_lean_effort').value)),
-        )
         effort = clamp(
-            effort_gain * active_error,
+            effort_gain * active_error
+            + effort_rate_gain * rate_error,
             -effort_limit,
             effort_limit,
         )
@@ -1086,6 +1183,7 @@ class SixMotorBalanceTeleop(Node):
             f'theta_ref={pitch_ref_deg:+.2f} deg | '
             f'theta_err={math.degrees(self.last_pitch_error):+.2f} deg | '
             f'lean={self.last_leg_lean_offset:+.4f} rad | '
+            f'lean_ff={self.last_leg_lean_effort:+.3f} N*m | '
             f'wheel=[{self.last_wheel_command[0]:+.3f}, '
             f'{self.last_wheel_command[1]:+.3f}] N*m | '
             f'{self.last_safety_reason}      ',

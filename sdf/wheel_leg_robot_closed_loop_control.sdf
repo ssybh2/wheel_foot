@@ -14,11 +14,12 @@
         </inertia>
       </inertial>
       <collision name="base_link_collision">
-        <pose>0 0 0 0 -0 0</pose>
+        <pose>0 0 0 0 1.5708 0</pose>
         <geometry>
-          <box>
-            <size>0.35 0.25 0.02</size>
-          </box>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>file:///home/hby/foot_ws/src/wheel_leg_description/meshes/visual/shell_and_big_motor.stl</uri>
+          </mesh>
         </geometry>
       </collision>
       <visual name="base_link_visual">
@@ -66,11 +67,12 @@
         </inertia>
       </inertial>
       <collision name="big_arm_1_link_collision">
-        <pose>0 0 0 0 -0 0</pose>
+        <pose>-0.231306 -0.053564 -0.030643 0 1.5708 0</pose>
         <geometry>
-          <box>
-            <size>0.1 0.025 0.025</size>
-          </box>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>file:///home/hby/foot_ws/src/wheel_leg_description/meshes/visual/big_arm_1.stl</uri>
+          </mesh>
         </geometry>
       </collision>
       <visual name="big_arm_1_link_visual">
@@ -118,11 +120,12 @@
         </inertia>
       </inertial>
       <collision name="small_leg_wheel_2_link_collision">
-        <pose>0 0 0 0 -0 0</pose>
+        <pose>-0.306005 0.083436 -0.002006 0 1.5708 0</pose>
         <geometry>
-          <box>
-            <size>0.14 0.025 0.025</size>
-          </box>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>file:///home/hby/foot_ws/src/wheel_leg_description/meshes/visual/small_leg_wheel_2.stl</uri>
+          </mesh>
         </geometry>
       </collision>
       <visual name="small_leg_wheel_2_link_visual">
@@ -166,12 +169,12 @@
         </inertia>
       </inertial>
       <collision name="wheel_motor_2_link_collision">
-        <pose>0 0 0 1.5708 -0 0</pose>
+        <pose>-0.201207 0.083436 0.056453 0 1.5708 0</pose>
         <geometry>
-          <cylinder>
-            <length>0.035</length>
-            <radius>0.045</radius>
-          </cylinder>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>file:///home/hby/foot_ws/src/wheel_leg_description/meshes/visual/wheel_motor_2.stl</uri>
+          </mesh>
         </geometry>
         <surface>
           <contact>
@@ -233,11 +236,12 @@
         </inertia>
       </inertial>
       <collision name="big_arm_2_link_collision">
-        <pose>0 0 0 0 -0 0</pose>
+        <pose>-0.16144 -0.053564 -0.026313 0 1.5708 0</pose>
         <geometry>
-          <box>
-            <size>0.1 0.025 0.025</size>
-          </box>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>file:///home/hby/foot_ws/src/wheel_leg_description/meshes/visual/big_arm_2.stl</uri>
+          </mesh>
         </geometry>
       </collision>
       <visual name="big_arm_2_link_visual">
@@ -285,11 +289,12 @@
         </inertia>
       </inertial>
       <collision name="small_leg_wheel_1_link_collision">
-        <pose>0 0 0 0 -0 0</pose>
+        <pose>-0.091299 -0.088564 0.01216 0 1.5708 0</pose>
         <geometry>
-          <box>
-            <size>0.14 0.025 0.025</size>
-          </box>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>file:///home/hby/foot_ws/src/wheel_leg_description/meshes/visual/small_leg_wheel_1.stl</uri>
+          </mesh>
         </geometry>
       </collision>
       <visual name="small_leg_wheel_1_link_visual">
@@ -333,12 +338,12 @@
         </inertia>
       </inertial>
       <collision name="wheel_motor_1_link_collision">
-        <pose>0 0 0 1.5708 -0 0</pose>
+        <pose>-0.20482 -0.080564 0.051057 0 1.5708 0</pose>
         <geometry>
-          <cylinder>
-            <length>0.035</length>
-            <radius>0.045</radius>
-          </cylinder>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>file:///home/hby/foot_ws/src/wheel_leg_description/meshes/visual/wheel_motor_1.stl</uri>
+          </mesh>
         </geometry>
         <surface>
           <contact>
@@ -400,11 +405,12 @@
         </inertia>
       </inertial>
       <collision name="big_arm_3_link_collision">
-        <pose>0 0 0 0 -0 0</pose>
+        <pose>-0.231306 0.048436 -0.030643 0 1.5708 0</pose>
         <geometry>
-          <box>
-            <size>0.1 0.025 0.025</size>
-          </box>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>file:///home/hby/foot_ws/src/wheel_leg_description/meshes/visual/big_arm_3.stl</uri>
+          </mesh>
         </geometry>
       </collision>
       <visual name="big_arm_3_link_visual">
@@ -452,11 +458,12 @@
         </inertia>
       </inertial>
       <collision name="small_leggy_1_link_collision">
-        <pose>0 0 0 0 -0 0</pose>
+        <pose>-0.308448 -0.080564 -0.009451 0 1.5708 0</pose>
         <geometry>
-          <box>
-            <size>0.14 0.02 0.02</size>
-          </box>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>file:///home/hby/foot_ws/src/wheel_leg_description/meshes/visual/small_leggy_1.stl</uri>
+          </mesh>
         </geometry>
       </collision>
       <visual name="small_leggy_1_link_visual">
@@ -504,11 +511,12 @@
         </inertia>
       </inertial>
       <collision name="big_arm_4_link_collision">
-        <pose>0 0 0 0 -0 0</pose>
+        <pose>-0.16144 0.048436 -0.026313 0 1.5708 0</pose>
         <geometry>
-          <box>
-            <size>0.1 0.025 0.025</size>
-          </box>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>file:///home/hby/foot_ws/src/wheel_leg_description/meshes/visual/big_arm_4.stl</uri>
+          </mesh>
         </geometry>
       </collision>
       <visual name="big_arm_4_link_visual">
@@ -556,11 +564,12 @@
         </inertia>
       </inertial>
       <collision name="small_leggy_2_link_collision">
-        <pose>0 0 0 0 -0 0</pose>
+        <pose>-0.090381 0.075436 0.010437 0 1.5708 0</pose>
         <geometry>
-          <box>
-            <size>0.14 0.02 0.02</size>
-          </box>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>file:///home/hby/foot_ws/src/wheel_leg_description/meshes/visual/small_leggy_2.stl</uri>
+          </mesh>
         </geometry>
       </collision>
       <visual name="small_leggy_2_link_visual">

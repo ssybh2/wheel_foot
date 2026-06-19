@@ -37,11 +37,22 @@ six_motor_manual_controller:
     leg_lean_rate_gain: 0.02
     max_leg_lean_offset: 0.04
 
+    # STOP-state body pitch hold. This keeps the body close to theta_ref=0
+    # using a small leg lean correction without changing the W/S gains.
+    stand_pitch_hold_enabled: true
+    stand_pitch_deadband_deg: 0.3
+    stand_lean_gain: 0.90
+    stand_lean_rate_gain: 0.2
+    max_stand_lean_offset: 0.03
+    stand_lean_effort_gain: 8.0
+    stand_lean_effort_rate_gain: 0.15
+    max_stand_lean_effort: 0.80
+
     # Initial geometry candidate: all four signs equal.
-    leg_lean_j1: 1.0
-    leg_lean_j2: 1.0
-    leg_lean_j3: 1.0
-    leg_lean_j4: 1.0
+    leg_lean_j1: -1.0
+    leg_lean_j2: -1.0
+    leg_lean_j3: -1.0
+    leg_lean_j4: -1.0
 
     # Keep direct leg-torque feedforward disabled initially.
     pitch_error_deadband_deg: 1.0
@@ -85,15 +96,15 @@ six_motor_manual_controller:
     max_wheel_torque: 0.50
 
     # Base leg posture
-    j1: 0.15
-    j2: -0.15
-    j3: 0.15
-    j4: -0.15
+    j1: 0.35
+    j2: -0.35
+    j3: 0.35
+    j4: -0.35
 
     # Leg PD
     leg_kp: 1.0
     leg_kd: 0.20
     max_leg_effort: 2.0
-    leg_target_slew_rate: 0.90
+    leg_target_slew_rate: 2.90
     leg_extension_step: 0.01
     max_leg_extension_offset: 0.20
