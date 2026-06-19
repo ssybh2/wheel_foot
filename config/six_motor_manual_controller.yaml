@@ -16,10 +16,10 @@ six_motor_manual_controller:
     status_period: 0.20
 
     # W/S target vehicle speed
-    command_speed: 0.08
+    command_speed: 0.8
     speed_step: 0.02
     max_target_speed: 0.25
-    target_speed_slew_rate: 0.40
+    target_speed_slew_rate: 2.40
     target_speed_epsilon: 0.002
 
     # Vehicle-speed reference -> body-pitch reference
@@ -38,10 +38,10 @@ six_motor_manual_controller:
     max_leg_lean_offset: 0.04
 
     # Initial geometry candidate: all four signs equal.
-    leg_lean_j1: -1.0
-    leg_lean_j2: -1.0
-    leg_lean_j3: -1.0
-    leg_lean_j4: -1.0
+    leg_lean_j1: 1.0
+    leg_lean_j2: 1.0
+    leg_lean_j3: 1.0
+    leg_lean_j4: 1.0
 
     # Keep direct leg-torque feedforward disabled initially.
     pitch_error_deadband_deg: 1.0
@@ -94,6 +94,6 @@ six_motor_manual_controller:
     leg_kp: 1.0
     leg_kd: 0.20
     max_leg_effort: 2.0
-    leg_target_slew_rate: 0.40
+    leg_target_slew_rate: 0.90
     leg_extension_step: 0.01
     max_leg_extension_offset: 0.20

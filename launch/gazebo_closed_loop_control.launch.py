@@ -65,7 +65,7 @@ def generate_launch_description():
             '-entity', 'wheel_leg_robot',
             '-x', '0',
             '-y', '0',
-            '-z', '0.30'
+            '-z', '0.10'
         ],
         output='screen'
     )
