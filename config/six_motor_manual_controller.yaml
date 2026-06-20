@@ -21,7 +21,7 @@ six_motor_manual_controller:
     command_speed: 0.8
     speed_step: 0.02
     max_target_speed: 0.25
-    target_speed_slew_rate: 2.40
+    target_speed_slew_rate: 4.0
     target_speed_epsilon: 0.002
 
     # Vehicle-speed reference -> body-pitch reference
@@ -45,10 +45,10 @@ six_motor_manual_controller:
     stand_pitch_deadband_deg: 0.3
     stand_lean_gain: 0.90
     stand_lean_rate_gain: 0.2
-    max_stand_lean_offset: 0.03
+    max_stand_lean_offset: 0.3
     stand_lean_effort_gain: 8.0
     stand_lean_effort_rate_gain: 0.15
-    max_stand_lean_effort: 0.80
+    max_stand_lean_effort: 0.08
 
     # Initial geometry candidate: all four signs equal.
     leg_lean_j1: -1.0
@@ -87,7 +87,7 @@ six_motor_manual_controller:
     # Direction calibration
     balance_sign: 1.0
     pitch_sign: 1.0
-    forward_sign: 1.0
+    forward_sign: -1.0
     turn_sign: 1.0
 
     # Start with command-space signs unchanged:
@@ -100,18 +100,18 @@ six_motor_manual_controller:
     turn_torque: 0.0
     turn_torque_step: 0.02
     max_turn_torque: 0.15
-    max_wheel_torque: 0.80
+    max_wheel_torque: 2.0
 
     # Base leg posture
-    j1: 0.3
-    j2: -0.3
-    j3: 0.3
-    j4: -0.3
+    j1: 0.08
+    j2: -0.08
+    j3: 0.08
+    j4: -0.08
 
     # Leg PD
-    leg_kp: 0.5
+    leg_kp: 0.9
     leg_kd: 0.05
-    max_leg_effort: 2.0
+    max_leg_effort: 20.0
     leg_target_slew_rate: 2.90
     leg_extension_step: 0.01
     max_leg_extension_offset: 0.20
