@@ -74,10 +74,17 @@ class LQRBalanceController(Node):
 
         # Because current Gazebo controller accepts wheel velocity, not force.
         self.declare_parameter('wheel_radius', 0.045)
-        self.declare_parameter('control_sign', 1.0)
+        self.declare_parameter('control_sign', -1.0)
         self.declare_parameter('max_wheel_torque', 3.0)
 
-        self.declare_parameter('fall_angle_deg', 35.0)
+        # Pitch reference. The default uses the world horizontal frame:
+        # theta = measured_pitch - pitch_zero_deg.
+        # Set pitch_zero_mode:=startup to restore the old behavior.
+        self.declare_parameter('pitch_zero_mode', 'world')
+        self.declare_parameter('pitch_zero_deg', 0.0)
+        self.declare_parameter('pitch_sign', 1.0)
+
+        self.declare_parameter('fall_angle_deg', 80.0)
 
         self.pitch = None
         self.pitch_rate = None
@@ -122,16 +129,33 @@ class LQRBalanceController(Node):
     def odom_cb(self, msg):
         q = msg.pose.pose.orientation
 
-        self.pitch = quat_to_pitch(q.x, q.y, q.z, q.w)
-        self.pitch_rate = msg.twist.twist.angular.y
+        pitch_sign = 1.0 if float(
+            self.get_parameter('pitch_sign').value
+        ) >= 0.0 else -1.0
+
+        self.pitch = pitch_sign * quat_to_pitch(q.x, q.y, q.z, q.w)
+        self.pitch_rate = pitch_sign * msg.twist.twist.angular.y
         self.x = msg.pose.pose.position.x
         self.x_dot = msg.twist.twist.linear.x
 
         if self.pitch0 is None:
-            self.pitch0 = self.pitch
+            zero_mode = str(
+                self.get_parameter('pitch_zero_mode').value
+            ).strip().lower()
+            if zero_mode == 'startup':
+                self.pitch0 = self.pitch
+                zero_source = 'startup pose'
+            else:
+                self.pitch0 = math.radians(
+                    float(self.get_parameter('pitch_zero_deg').value)
+                )
+                zero_source = 'world horizontal'
+
             self.x0 = self.x
             self.get_logger().info(
-                f'Set equilibrium: pitch0={math.degrees(self.pitch0):.4f} deg, x0={self.x0:.4f} m'
+                f'Set equilibrium from {zero_source}: '
+                f'pitch0={math.degrees(self.pitch0):.4f} deg, '
+                f'x0={self.x0:.4f} m'
             )
 
     def control_loop(self):
@@ -169,7 +193,8 @@ class LQRBalanceController(Node):
     def stop(self):
         msg = Float64MultiArray()
         msg.data = [0.0, 0.0]
-        self.pub_cmd.publish(msg)
+        if rclpy.ok():
+            self.pub_cmd.publish(msg)
 
 
 def main(args=None):
@@ -181,7 +206,10 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
 
-    node.stop()
+    try:
+        node.stop()
+    except Exception as exc:
+        node.get_logger().warning(f'Failed to publish final zero command: {exc}')
     node.destroy_node()
 
     try:

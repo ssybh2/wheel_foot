@@ -112,6 +112,15 @@ def sign_or_zero(value: float) -> float:
     return 1.0 if value > 0.0 else -1.0
 
 
+def approach_zero(value: float, max_delta: float) -> float:
+    """Move value toward zero by at most max_delta."""
+    if max_delta <= 0.0:
+        return value
+    if abs(value) <= max_delta:
+        return 0.0
+    return value - math.copysign(max_delta, value)
+
+
 def quaternion_to_pitch(
     qx: float,
     qy: float,
@@ -217,6 +226,9 @@ class SixMotorBalanceTeleop(Node):
         self.declare_parameter('stand_pitch_deadband_deg', 0.3)
         self.declare_parameter('stand_lean_gain', 0.20)
         self.declare_parameter('stand_lean_rate_gain', 0.02)
+        self.declare_parameter('stand_lean_integral_gain', 0.60)
+        self.declare_parameter('stand_level_capture_deg', 1.5)
+        self.declare_parameter('stand_lean_return_rate', 0.04)
         self.declare_parameter('max_stand_lean_offset', 0.03)
         self.declare_parameter('stand_lean_effort_gain', 8.0)
         self.declare_parameter('stand_lean_effort_rate_gain', 0.15)
@@ -437,7 +449,9 @@ class SixMotorBalanceTeleop(Node):
         self.last_pitch_ref = 0.0
         self.last_pitch_error = 0.0
         self.last_drive_effort = 0.0
+        self.stand_lean_bias = 0.0
         self.last_leg_lean_offset = 0.0
+        self.last_stand_lean_bias = 0.0
         self.last_leg_lean_effort = 0.0
         self.last_wheel_command = (0.0, 0.0)
         self.last_leg_command = [0.0, 0.0, 0.0, 0.0]
@@ -760,8 +774,9 @@ class SixMotorBalanceTeleop(Node):
             float(self.get_parameter('leg_lean_j4').value),
         ]
 
-    def desired_leg_targets(self) -> List[float]:
+    def desired_leg_targets(self, dt: float = 0.0) -> List[float]:
         lean_offset = 0.0
+        self.last_stand_lean_bias = self.stand_lean_bias
 
         if (
             self.drive_mode == 'leg_lean_assist'
@@ -825,6 +840,31 @@ class SixMotorBalanceTeleop(Node):
             stand_rate_gain = float(
                 self.get_parameter('stand_lean_rate_gain').value
             )
+            stand_integral_gain = float(
+                self.get_parameter('stand_lean_integral_gain').value
+            )
+            level_capture = max(
+                deadband,
+                math.radians(
+                    abs(
+                        float(
+                            self.get_parameter(
+                                'stand_level_capture_deg'
+                            ).value
+                        )
+                    )
+                ),
+            )
+            return_rate = max(
+                0.0,
+                abs(
+                    float(
+                        self.get_parameter(
+                            'stand_lean_return_rate'
+                        ).value
+                    )
+                ),
+            )
             max_stand_lean_offset = max(
                 0.0,
                 abs(
@@ -836,12 +876,29 @@ class SixMotorBalanceTeleop(Node):
                 ),
             )
 
+            if max_stand_lean_offset <= 0.0:
+                self.stand_lean_bias = 0.0
+            elif abs(theta) > level_capture:
+                self.stand_lean_bias = clamp(
+                    self.stand_lean_bias
+                    + stand_integral_gain * active_error * max(0.0, dt),
+                    -max_stand_lean_offset,
+                    max_stand_lean_offset,
+                )
+            else:
+                self.stand_lean_bias = approach_zero(
+                    self.stand_lean_bias,
+                    return_rate * max(0.0, dt),
+                )
+
             lean_offset = clamp(
-                stand_lean_gain * active_error
+                self.stand_lean_bias
+                + stand_lean_gain * active_error
                 - stand_rate_gain * theta_dot,
                 -max_stand_lean_offset,
                 max_stand_lean_offset,
             )
+            self.last_stand_lean_bias = self.stand_lean_bias
             self.last_pitch_error = pitch_error
 
         self.last_leg_lean_offset = lean_offset
@@ -941,7 +998,7 @@ class SixMotorBalanceTeleop(Node):
         if self.commanded_leg_targets is None:
             return
 
-        desired = self.desired_leg_targets()
+        desired = self.desired_leg_targets(dt)
         slew_rate = max(
             0.01,
             abs(
@@ -1259,6 +1316,7 @@ class SixMotorBalanceTeleop(Node):
             f'theta_ref={pitch_ref_deg:+.2f} deg | '
             f'theta_err={math.degrees(self.last_pitch_error):+.2f} deg | '
             f'lean={self.last_leg_lean_offset:+.4f} rad | '
+            f'bias={self.last_stand_lean_bias:+.4f} rad | '
             f'lean_ff={self.last_leg_lean_effort:+.3f} N*m | '
             f'wheel=[{self.last_wheel_command[0]:+.3f}, '
             f'{self.last_wheel_command[1]:+.3f}] N*m | '
