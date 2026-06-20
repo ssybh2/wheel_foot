@@ -166,6 +166,8 @@ class SixMotorBalanceTeleop(Node):
         self.declare_parameter('start_delay', 0.50)
         self.declare_parameter('fall_angle_deg', 25.0)
         self.declare_parameter('status_period', 0.20)
+        self.declare_parameter('pitch_zero_mode', 'world')
+        self.declare_parameter('pitch_zero_deg', 0.0)
 
         # --------------------------------------------------------------
         # Keyboard target velocity
@@ -245,6 +247,11 @@ class SixMotorBalanceTeleop(Node):
         self.declare_parameter('wheel_assist_velocity_kd', 0.60)
         self.declare_parameter('wheel_speed_ff_gain', 1.00)
         self.declare_parameter('max_wheel_assist_torque', 0.30)
+        self.declare_parameter('stand_wheel_balance_enabled', True)
+        self.declare_parameter('stand_wheel_balance_kp', 3.0)
+        self.declare_parameter('stand_wheel_balance_kd', 0.35)
+        self.declare_parameter('stand_wheel_velocity_kd', 0.30)
+        self.declare_parameter('max_stand_wheel_torque', 0.80)
 
         # Full wheel_balance mode gains.
         self.declare_parameter('balance_kp', 2.0)
@@ -517,10 +524,21 @@ class SixMotorBalanceTeleop(Node):
         self.last_odom_wall_time = time.monotonic()
 
         if self.pitch0 is None:
-            self.pitch0 = self.pitch
+            zero_mode = str(
+                self.get_parameter('pitch_zero_mode').value
+            ).strip().lower()
+            if zero_mode == 'startup':
+                self.pitch0 = self.pitch
+                zero_source = 'startup pose'
+            else:
+                self.pitch0 = math.radians(
+                    float(self.get_parameter('pitch_zero_deg').value)
+                )
+                zero_source = 'world reference'
+
             self.position_hold_reference = self.position_x
             self.get_logger().info(
-                'Captured equilibrium: '
+                f'Using {zero_source}: '
                 f'pitch0={math.degrees(self.pitch0):.3f} deg, '
                 f'x0={self.position_hold_reference:.3f} m'
             )
@@ -640,6 +658,12 @@ class SixMotorBalanceTeleop(Node):
             or abs(self.last_pitch_ref) > math.radians(0.05)
         )
 
+    def speed_command_active(self) -> bool:
+        return (
+            abs(self.requested_target_speed) > self.target_speed_epsilon
+            or abs(self.filtered_target_speed) > self.target_speed_epsilon
+        )
+
     def update_motion_reference(self, now: float, dt: float) -> bool:
         """Update one shared speed/pitch reference for legs and wheels."""
         self.refresh_keyboard_command(now)
@@ -675,6 +699,12 @@ class SixMotorBalanceTeleop(Node):
 
         speed_error = self.filtered_target_speed - velocity
         self.last_speed_error = speed_error
+
+        if not self.speed_command_active():
+            self.last_pitch_ref = 0.0
+            self.last_pitch_error = -theta
+            self.last_safety_reason = 'active'
+            return True
 
         max_pitch_ref = math.radians(
             abs(float(self.get_parameter('max_pitch_ref_deg').value))
@@ -1015,7 +1045,53 @@ class SixMotorBalanceTeleop(Node):
             self.get_parameter('wheel_speed_ff_gain').value
         )
 
-        if self.drive_mode == 'leg_lean_assist':
+        stand_wheel_balance_active = (
+            self.drive_mode == 'leg_lean_assist'
+            and not self.speed_command_active()
+            and bool(
+                self.get_parameter(
+                    'stand_wheel_balance_enabled'
+                ).value
+            )
+        )
+
+        if stand_wheel_balance_active:
+            stand_kp = float(
+                self.get_parameter('stand_wheel_balance_kp').value
+            )
+            stand_kd = float(
+                self.get_parameter('stand_wheel_balance_kd').value
+            )
+            stand_velocity_kd = float(
+                self.get_parameter('stand_wheel_velocity_kd').value
+            )
+            position_hold_kp = float(
+                self.get_parameter('position_hold_kp').value
+            )
+            stand_limit = max(
+                0.0,
+                abs(
+                    float(
+                        self.get_parameter(
+                            'max_stand_wheel_torque'
+                        ).value
+                    )
+                ),
+            )
+
+            control_effort = (
+                stand_kp * (0.0 - theta)
+                - stand_kd * theta_dot
+                - stand_velocity_kd * velocity
+                - position_hold_kp * position_error
+            )
+            raw_drive_effort = self.balance_sign * control_effort
+            raw_drive_effort = clamp(
+                raw_drive_effort,
+                -stand_limit,
+                stand_limit,
+            )
+        elif self.drive_mode == 'leg_lean_assist':
             assist_pitch_kp = float(
                 self.get_parameter('wheel_assist_pitch_kp').value
             )

@@ -12,8 +12,10 @@ six_motor_manual_controller:
     joint_state_timeout: 0.30
     odom_timeout: 0.30
     start_delay: 0.50
-    fall_angle_deg: 25.0
+    fall_angle_deg: 70.0
     status_period: 0.20
+    pitch_zero_mode: world
+    pitch_zero_deg: 0.0
 
     # W/S target vehicle speed
     command_speed: 0.8
@@ -70,6 +72,11 @@ six_motor_manual_controller:
     wheel_assist_velocity_kd: 0.60
     wheel_speed_ff_gain: 1.00
     max_wheel_assist_torque: 0.30
+    stand_wheel_balance_enabled: true
+    stand_wheel_balance_kp: 3.0
+    stand_wheel_balance_kd: 0.35
+    stand_wheel_velocity_kd: 0.80
+    max_stand_wheel_torque: 0.80
 
     # wheel_balance mode
     balance_kp: 2.0
@@ -93,17 +100,17 @@ six_motor_manual_controller:
     turn_torque: 0.0
     turn_torque_step: 0.02
     max_turn_torque: 0.15
-    max_wheel_torque: 0.50
+    max_wheel_torque: 0.80
 
     # Base leg posture
-    j1: 0.35
-    j2: -0.35
-    j3: 0.35
-    j4: -0.35
+    j1: 0.3
+    j2: -0.3
+    j3: 0.3
+    j4: -0.3
 
     # Leg PD
-    leg_kp: 1.0
-    leg_kd: 0.20
+    leg_kp: 0.5
+    leg_kd: 0.05
     max_leg_effort: 2.0
     leg_target_slew_rate: 2.90
     leg_extension_step: 0.01
