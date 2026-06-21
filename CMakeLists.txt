@@ -10,9 +10,16 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-ament_package()
 
+install(
+  PROGRAMS
+    scripts/five_bar_kinematics.py
+    scripts/five_bar_kinematics_node.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 install(
   DIRECTORY urdf meshes launch rviz worlds sdf
   DESTINATION share/${PROJECT_NAME}
 )
+
+ament_package()

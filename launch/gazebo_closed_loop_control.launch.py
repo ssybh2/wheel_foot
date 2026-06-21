@@ -47,9 +47,18 @@ def generate_launch_description():
         ],
         output='screen'
     )
-
+    kinematics_node = Node(
+        package='wheel_leg_description',
+        executable='five_bar_kinematics_node.py',
+        name='five_bar_kinematics',
+        output='screen',
+        parameters=[
+            {'use_sim_time': True}
+        ],
+    )
     return LaunchDescription([
         SetEnvironmentVariable('GAZEBO_MODEL_DATABASE_URI', ''),
         gazebo,
         TimerAction(period=4.0, actions=[spawn_robot]),
+        TimerAction(period=5.0, actions=[kinematics_node]),
     ])
