@@ -1,0 +1,78 @@
+fixed_leg_hold:
+  ros__parameters:
+    joint_state_topic: /joint_states
+    leg_command_topic: /leg_effort_controller/commands
+    ik_request_topic: /kinematics/ik_request
+    ik_target_topic: /kinematics/ik_joint_targets
+    ready_topic: /fixed_leg_hold/ready
+
+    control_rate: 200.0
+    joint_state_timeout: 0.20
+    ik_request_period: 0.50
+    start_delay: 0.20
+    status_period: 0.50
+
+    # Safer first-run leg hold.
+    kp: 3.0
+    kd: 0.20
+    max_effort: 2.0
+    target_slew_rate: 0.60
+    ready_tolerance: 0.050
+
+    # First-run target: current q=0 Gazebo posture.
+    wheel_1_target_x: 0.204820
+    wheel_1_target_z: -0.051057
+    wheel_2_target_x: 0.201207
+    wheel_2_target_z: -0.056453
+
+    # q=0 fallback target.
+    fallback_j1: 0.0
+    fallback_j2: 0.0
+    fallback_j3: 0.0
+    fallback_j4: 0.0
+
+lqr_balance_controller:
+  ros__parameters:
+    joint_state_topic: /joint_states
+    link_states_topic: /gazebo/link_states
+    fk_topic: /kinematics/fk_wheel_centers
+    leg_ready_topic: /fixed_leg_hold/ready
+    wheel_command_topic: /wheel_effort_controller/commands
+    base_link_name: wheel_leg_robot::base_link
+
+    control_rate: 200.0
+    state_timeout: 0.20
+    status_period: 0.20
+
+    # Do not auto-enable while the robot is still settling.
+    auto_enable: false
+    enable_delay: 0.50
+    require_leg_ready: true
+
+    wheel_radius: 0.029
+
+    pitch_zero_deg: 0.0
+    pitch_sign: 1.0
+    pitch_rate_sign: 1.0
+
+    wheel_1_state_sign: 1.0
+    wheel_2_state_sign: 1.0
+    wheel_1_effort_sign: 1.0
+    wheel_2_effort_sign: 1.0
+    control_sign: 1.0
+
+    # Temporary assumed fixed-height LQR gain.
+    k_theta: -10.43025064
+    k_theta_dot: -1.81360324
+    k_x: 0.62725848
+    k_x_dot: 1.76654387
+
+    # Conservative first-run wheel torque.
+    max_total_wheel_torque: 0.15
+    torque_slew_rate: 1.0
+    fall_angle_deg: 30.0
+
+    # Initial q=0 leg height from current kinematics.
+    target_leg_height: 0.053755
+    max_leg_height_error: 0.020
+    enforce_leg_height_safety: false

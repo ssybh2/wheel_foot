@@ -10,15 +10,17 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-
 install(
   PROGRAMS
     scripts/five_bar_kinematics.py
     scripts/five_bar_kinematics_node.py
+    scripts/fixed_leg_hold.py
+    scripts/lqr_balance_controller.py
   DESTINATION lib/${PROJECT_NAME}
 )
+
 install(
-  DIRECTORY urdf meshes launch rviz worlds sdf
+  DIRECTORY urdf meshes launch rviz worlds sdf config
   DESTINATION share/${PROJECT_NAME}
 )
 

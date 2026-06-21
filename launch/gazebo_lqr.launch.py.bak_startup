@@ -1,0 +1,190 @@
+import os
+import xml.etree.ElementTree as ET
+
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch.actions import (
+    IncludeLaunchDescription,
+    RegisterEventHandler,
+    SetEnvironmentVariable,
+    TimerAction,
+)
+from launch.event_handlers import OnProcessExit
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
+
+
+def load_clean_robot_description(urdf_file: str) -> str:
+    """Load URDF and serialize it without XML comments or declaration.
+
+    gazebo_ros2_control on ROS 2 Humble may fail when robot_description
+    contains comments with colons. ElementTree drops comments and returns
+    a clean XML string.
+    """
+    root = ET.parse(urdf_file).getroot()
+    return ET.tostring(root, encoding='unicode')
+
+
+def generate_launch_description():
+    pkg_share = get_package_share_directory('wheel_leg_description')
+    gazebo_ros_share = get_package_share_directory('gazebo_ros')
+
+    sdf_file = os.path.join(
+        pkg_share,
+        'sdf',
+        'wheel_leg_robot_closed_loop_control.sdf',
+    )
+    urdf_file = os.path.join(
+        pkg_share,
+        'urdf',
+        'wheel_leg_robot.urdf',
+    )
+    world_file = os.path.join(
+        pkg_share,
+        'worlds',
+        'wheel_leg_ground.world',
+    )
+    node_config = os.path.join(
+        pkg_share,
+        'config',
+        'lqr_demo.yaml',
+    )
+
+    robot_description = load_clean_robot_description(urdf_file)
+
+    robot_state_publisher = Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        name='robot_state_publisher',
+        output='screen',
+        parameters=[
+            {
+                'robot_description': ParameterValue(
+                    robot_description,
+                    value_type=str,
+                ),
+                'use_sim_time': True,
+            }
+        ],
+    )
+
+    gazebo = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(
+                gazebo_ros_share,
+                'launch',
+                'gazebo.launch.py',
+            )
+        ),
+        launch_arguments={
+            'world': world_file,
+            'pause': 'false',
+            'verbose': 'true',
+        }.items(),
+    )
+
+    spawn_robot = Node(
+        package='gazebo_ros',
+        executable='spawn_entity.py',
+        arguments=[
+            '-file', sdf_file,
+            '-entity', 'wheel_leg_robot',
+            '-x', '0',
+            '-y', '0',
+            '-z', '0.170',
+        ],
+        output='screen',
+    )
+
+    kinematics_node = Node(
+        package='wheel_leg_description',
+        executable='five_bar_kinematics_node.py',
+        name='five_bar_kinematics',
+        output='screen',
+        parameters=[{'use_sim_time': True}],
+    )
+
+    fixed_leg_node = Node(
+        package='wheel_leg_description',
+        executable='fixed_leg_hold.py',
+        name='fixed_leg_hold',
+        output='screen',
+        parameters=[
+            node_config,
+            {'use_sim_time': False},
+        ],
+    )
+
+    lqr_node = Node(
+        package='wheel_leg_description',
+        executable='lqr_balance_controller.py',
+        name='lqr_balance_controller',
+        output='screen',
+        parameters=[
+            node_config,
+            {'use_sim_time': False},
+        ],
+    )
+
+    wheel_controller_spawner = Node(
+        package='controller_manager',
+        executable='spawner',
+        arguments=[
+            'wheel_effort_controller',
+            '--controller-manager',
+            '/controller_manager',
+            '--controller-manager-timeout',
+            '30',
+            '--switch-timeout',
+            '30',
+        ],
+        output='screen',
+    )
+
+    leg_controller_spawner = Node(
+        package='controller_manager',
+        executable='spawner',
+        arguments=[
+            'leg_effort_controller',
+            '--controller-manager',
+            '/controller_manager',
+            '--controller-manager-timeout',
+            '30',
+            '--switch-timeout',
+            '30',
+        ],
+        output='screen',
+    )
+
+    start_after_spawn = RegisterEventHandler(
+        OnProcessExit(
+            target_action=spawn_robot,
+            on_exit=[
+                kinematics_node,
+                fixed_leg_node,
+                lqr_node,
+                TimerAction(
+                    period=1.5,
+                    actions=[
+                        wheel_controller_spawner,
+                        leg_controller_spawner,
+                    ],
+                ),
+            ],
+        )
+    )
+
+    return LaunchDescription([
+        SetEnvironmentVariable(
+            'GAZEBO_MODEL_DATABASE_URI',
+            '',
+        ),
+        robot_state_publisher,
+        gazebo,
+        TimerAction(
+            period=3.0,
+            actions=[spawn_robot],
+        ),
+        start_after_spawn,
+    ])

@@ -2,7 +2,7 @@
   <model name="wheel_leg_robot">
     <link name="base_link">
       <inertial>
-        <pose>0.196 0 0 0 -0 0</pose>
+        <pose>0 0 0 0 -0 0</pose>
         <mass>2</mass>
         <inertia>
           <ixx>0.01</ixx>
@@ -743,9 +743,7 @@
     <plugin
       name="gazebo_ros2_control"
       filename="libgazebo_ros2_control.so">
-            <robot_param>robot_description</robot_param>
-      <robot_param_node>robot_state_publisher</robot_param_node>
-<parameters>/home/hby/foot_ws/install/wheel_leg_description/share/wheel_leg_description/config/ros2_controllers.yaml</parameters>
+      <parameters>/home/hby/foot_ws/install/wheel_leg_description/share/wheel_leg_description/config/ros2_controllers.yaml</parameters>
       <hold_joints>true</hold_joints>
     </plugin>
 

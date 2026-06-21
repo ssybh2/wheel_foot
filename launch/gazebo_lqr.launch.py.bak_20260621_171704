@@ -1,0 +1,134 @@
+import os
+
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch.actions import (
+    IncludeLaunchDescription,
+    RegisterEventHandler,
+    SetEnvironmentVariable,
+    TimerAction,
+)
+from launch.event_handlers import OnProcessExit
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch_ros.actions import Node
+
+
+def generate_launch_description():
+    pkg_share = get_package_share_directory('wheel_leg_description')
+    gazebo_ros_share = get_package_share_directory('gazebo_ros')
+
+    sdf_file = os.path.join(
+        pkg_share,
+        'sdf',
+        'wheel_leg_robot_closed_loop_control.sdf',
+    )
+    world_file = os.path.join(
+        pkg_share,
+        'worlds',
+        'wheel_leg_ground.world',
+    )
+    node_config = os.path.join(
+        pkg_share,
+        'config',
+        'lqr_demo.yaml',
+    )
+
+    gazebo = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(gazebo_ros_share, 'launch', 'gazebo.launch.py')
+        ),
+        launch_arguments={
+            'world': world_file,
+            'pause': 'false',
+            'verbose': 'true',
+        }.items(),
+    )
+
+    spawn_robot = Node(
+        package='gazebo_ros',
+        executable='spawn_entity.py',
+        arguments=[
+            '-file', sdf_file,
+            '-entity', 'wheel_leg_robot',
+            '-x', '0',
+            '-y', '0',
+            # Target wheel centre is z=-0.14 m and wheel radius is 0.029 m.
+            '-z', '0.170',
+        ],
+        output='screen',
+    )
+
+    wheel_controller_spawner = Node(
+        package='controller_manager',
+        executable='spawner',
+        arguments=[
+            'wheel_effort_controller',
+            '--controller-manager', '/controller_manager',
+            '--controller-manager-timeout', '30',
+            '--switch-timeout', '30',
+        ],
+        output='screen',
+    )
+
+    leg_controller_spawner = Node(
+        package='controller_manager',
+        executable='spawner',
+        arguments=[
+            'leg_effort_controller',
+            '--controller-manager', '/controller_manager',
+            '--controller-manager-timeout', '30',
+            '--switch-timeout', '30',
+        ],
+        output='screen',
+    )
+
+    kinematics_node = Node(
+        package='wheel_leg_description',
+        executable='five_bar_kinematics_node.py',
+        name='five_bar_kinematics',
+        output='screen',
+        parameters=[{'use_sim_time': True}],
+    )
+
+    fixed_leg_node = Node(
+        package='wheel_leg_description',
+        executable='fixed_leg_hold.py',
+        name='fixed_leg_hold',
+        output='screen',
+        parameters=[node_config, {'use_sim_time': False}],
+    )
+
+    lqr_node = Node(
+        package='wheel_leg_description',
+        executable='lqr_balance_controller.py',
+        name='lqr_balance_controller',
+        output='screen',
+        parameters=[node_config, {'use_sim_time': False}],
+    )
+
+    start_after_spawn = RegisterEventHandler(
+        OnProcessExit(
+            target_action=spawn_robot,
+            on_exit=[
+                # Start state processing immediately after the model exists.
+                kinematics_node,
+                fixed_leg_node,
+                lqr_node,
+                # Give gazebo_ros2_control a short moment to expose services.
+                TimerAction(
+                    period=0.40,
+                    actions=[
+                        wheel_controller_spawner,
+                        leg_controller_spawner,
+                    ],
+                ),
+            ],
+        )
+    )
+
+    return LaunchDescription([
+        SetEnvironmentVariable('GAZEBO_MODEL_DATABASE_URI', ''),
+        gazebo,
+        TimerAction(period=3.0, actions=[spawn_robot]),
+        start_after_spawn,
+    ])

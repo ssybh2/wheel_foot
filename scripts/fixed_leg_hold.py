@@ -1,0 +1,322 @@
+#!/usr/bin/env python3
+
+import math
+import time
+from typing import Dict, List, Optional
+
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import JointState
+from std_msgs.msg import Bool, Float64MultiArray
+
+
+JOINT_NAMES = [
+    'big_arm_1_joint',
+    'big_arm_2_joint',
+    'big_arm_3_joint',
+    'big_arm_4_joint',
+]
+
+
+def clamp(value: float, lower: float, upper: float) -> float:
+    return max(lower, min(upper, value))
+
+
+def move_towards(current: float, target: float, max_step: float) -> float:
+    error = target - current
+    if abs(error) <= max_step:
+        return target
+    return current + math.copysign(max_step, error)
+
+
+class FixedLegHold(Node):
+    """Use IK targets and joint-space PD effort to keep a fixed leg posture."""
+
+    def __init__(self) -> None:
+        super().__init__('fixed_leg_hold')
+
+        self.declare_parameter('joint_state_topic', '/joint_states')
+        self.declare_parameter(
+            'leg_command_topic',
+            '/leg_effort_controller/commands',
+        )
+        self.declare_parameter(
+            'ik_request_topic',
+            '/kinematics/ik_request',
+        )
+        self.declare_parameter(
+            'ik_target_topic',
+            '/kinematics/ik_joint_targets',
+        )
+        self.declare_parameter('ready_topic', '/fixed_leg_hold/ready')
+
+        self.declare_parameter('control_rate', 200.0)
+        self.declare_parameter('joint_state_timeout', 0.20)
+        self.declare_parameter('ik_request_period', 0.50)
+        self.declare_parameter('start_delay', 0.20)
+        self.declare_parameter('status_period', 0.50)
+
+        self.declare_parameter('kp', 8.0)
+        self.declare_parameter('kd', 0.35)
+        self.declare_parameter('max_effort', 5.0)
+        self.declare_parameter('target_slew_rate', 1.50)
+        self.declare_parameter('ready_tolerance', 0.035)
+
+        # Desired wheel-center coordinates in base_link X-Z plane, metres.
+        self.declare_parameter('wheel_1_target_x', 0.196)
+        self.declare_parameter('wheel_1_target_z', -0.140)
+        self.declare_parameter('wheel_2_target_x', 0.196)
+        self.declare_parameter('wheel_2_target_z', -0.140)
+
+        # Fallback IK result for the current 0.08 m + 0.12 m Gazebo geometry.
+        # This lets the leg controller start before the IK topic replies.
+        self.declare_parameter('fallback_j1', 0.7688645342)
+        self.declare_parameter('fallback_j2', -0.5778278461)
+        self.declare_parameter('fallback_j3', 0.8668497334)
+        self.declare_parameter('fallback_j4', -0.6022318023)
+
+        self.joint_state_topic = str(
+            self.get_parameter('joint_state_topic').value
+        )
+        self.leg_command_topic = str(
+            self.get_parameter('leg_command_topic').value
+        )
+        self.ik_request_topic = str(
+            self.get_parameter('ik_request_topic').value
+        )
+        self.ik_target_topic = str(
+            self.get_parameter('ik_target_topic').value
+        )
+        self.ready_topic = str(self.get_parameter('ready_topic').value)
+
+        self.control_rate = float(self.get_parameter('control_rate').value)
+        self.joint_state_timeout = float(
+            self.get_parameter('joint_state_timeout').value
+        )
+        self.ik_request_period = float(
+            self.get_parameter('ik_request_period').value
+        )
+        self.start_delay = float(self.get_parameter('start_delay').value)
+        self.status_period = float(
+            self.get_parameter('status_period').value
+        )
+
+        self.kp = float(self.get_parameter('kp').value)
+        self.kd = float(self.get_parameter('kd').value)
+        self.max_effort = float(self.get_parameter('max_effort').value)
+        self.target_slew_rate = float(
+            self.get_parameter('target_slew_rate').value
+        )
+        self.ready_tolerance = float(
+            self.get_parameter('ready_tolerance').value
+        )
+
+        self.ik_request_data = [
+            float(self.get_parameter('wheel_1_target_x').value),
+            float(self.get_parameter('wheel_1_target_z').value),
+            float(self.get_parameter('wheel_2_target_x').value),
+            float(self.get_parameter('wheel_2_target_z').value),
+        ]
+
+        self.desired_joint_targets: List[float] = [
+            float(self.get_parameter('fallback_j1').value),
+            float(self.get_parameter('fallback_j2').value),
+            float(self.get_parameter('fallback_j3').value),
+            float(self.get_parameter('fallback_j4').value),
+        ]
+        self.commanded_joint_targets: Optional[List[float]] = None
+        self.received_ik_target = False
+
+        self.positions: Dict[str, float] = {}
+        self.velocities: Dict[str, float] = {}
+        self.last_joint_state_wall = 0.0
+
+        self.start_wall = time.monotonic()
+        self.last_loop_wall = self.start_wall
+        self.last_ik_request_wall = 0.0
+        self.last_status_wall = 0.0
+
+        self.command_publisher = self.create_publisher(
+            Float64MultiArray,
+            self.leg_command_topic,
+            10,
+        )
+        self.ready_publisher = self.create_publisher(
+            Bool,
+            self.ready_topic,
+            10,
+        )
+        self.ik_request_publisher = self.create_publisher(
+            Float64MultiArray,
+            self.ik_request_topic,
+            10,
+        )
+
+        self.create_subscription(
+            JointState,
+            self.joint_state_topic,
+            self.joint_state_callback,
+            30,
+        )
+        self.create_subscription(
+            JointState,
+            self.ik_target_topic,
+            self.ik_target_callback,
+            10,
+        )
+
+        self.timer = self.create_timer(
+            1.0 / max(self.control_rate, 1.0),
+            self.control_loop,
+        )
+
+        self.get_logger().info(
+            'Fixed leg hold started. IK request = '
+            f'{self.ik_request_data}'
+        )
+
+    def joint_state_callback(self, message: JointState) -> None:
+        velocity_available = len(message.velocity) == len(message.name)
+        for index, name in enumerate(message.name):
+            if name not in JOINT_NAMES:
+                continue
+            if index < len(message.position):
+                self.positions[name] = float(message.position[index])
+            if velocity_available:
+                self.velocities[name] = float(message.velocity[index])
+            else:
+                self.velocities.setdefault(name, 0.0)
+        self.last_joint_state_wall = time.monotonic()
+
+    def ik_target_callback(self, message: JointState) -> None:
+        target_map = {
+            name: float(position)
+            for name, position in zip(message.name, message.position)
+        }
+        if not all(name in target_map for name in JOINT_NAMES):
+            return
+
+        self.desired_joint_targets = [target_map[name] for name in JOINT_NAMES]
+        self.received_ik_target = True
+        self.get_logger().info(
+            'Received IK targets: '
+            + ', '.join(
+                f'{name}={value:+.4f}'
+                for name, value in zip(
+                    JOINT_NAMES,
+                    self.desired_joint_targets,
+                )
+            )
+        )
+
+    def publish_zero(self) -> None:
+        message = Float64MultiArray()
+        message.data = [0.0, 0.0, 0.0, 0.0]
+        self.command_publisher.publish(message)
+        ready_message = Bool()
+        ready_message.data = False
+        self.ready_publisher.publish(ready_message)
+
+    def publish_ik_request_if_needed(self, now: float) -> None:
+        if now - self.last_ik_request_wall < self.ik_request_period:
+            return
+        request = Float64MultiArray()
+        request.data = list(self.ik_request_data)
+        self.ik_request_publisher.publish(request)
+        self.last_ik_request_wall = now
+
+    def control_loop(self) -> None:
+        now = time.monotonic()
+        dt = clamp(now - self.last_loop_wall, 1.0e-4, 0.05)
+        self.last_loop_wall = now
+
+        self.publish_ik_request_if_needed(now)
+
+        if now - self.start_wall < self.start_delay:
+            self.publish_zero()
+            return
+
+        if now - self.last_joint_state_wall > self.joint_state_timeout:
+            self.publish_zero()
+            return
+
+        if not all(name in self.positions for name in JOINT_NAMES):
+            self.publish_zero()
+            return
+
+        current_positions = [self.positions[name] for name in JOINT_NAMES]
+        current_velocities = [self.velocities.get(name, 0.0) for name in JOINT_NAMES]
+
+        if self.commanded_joint_targets is None:
+            self.commanded_joint_targets = list(current_positions)
+
+        max_target_step = self.target_slew_rate * dt
+        for index in range(4):
+            self.commanded_joint_targets[index] = move_towards(
+                self.commanded_joint_targets[index],
+                self.desired_joint_targets[index],
+                max_target_step,
+            )
+
+        efforts: List[float] = []
+        for target, position, velocity in zip(
+            self.commanded_joint_targets,
+            current_positions,
+            current_velocities,
+        ):
+            effort = self.kp * (target - position) - self.kd * velocity
+            efforts.append(clamp(effort, -self.max_effort, self.max_effort))
+
+        command_message = Float64MultiArray()
+        command_message.data = efforts
+        self.command_publisher.publish(command_message)
+
+        maximum_error = max(
+            abs(target - position)
+            for target, position in zip(
+                self.desired_joint_targets,
+                current_positions,
+            )
+        )
+        targets_finished_slewing = max(
+            abs(target - command_target)
+            for target, command_target in zip(
+                self.desired_joint_targets,
+                self.commanded_joint_targets,
+            )
+        ) < 1.0e-3
+
+        ready = targets_finished_slewing and maximum_error < self.ready_tolerance
+        ready_message = Bool()
+        ready_message.data = ready
+        self.ready_publisher.publish(ready_message)
+
+        if now - self.last_status_wall >= self.status_period:
+            self.get_logger().info(
+                f'leg_ready={ready} ik={self.received_ik_target} '
+                f'max_error={maximum_error:.4f} rad '
+                f'effort={[round(value, 3) for value in efforts]}'
+            )
+            self.last_status_wall = now
+
+
+def main(args=None) -> None:
+    rclpy.init(args=args)
+    node = FixedLegHold()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        try:
+            if rclpy.ok():
+                node.publish_zero()
+        except Exception:
+            pass
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()
