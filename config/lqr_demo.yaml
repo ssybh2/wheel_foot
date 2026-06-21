@@ -13,11 +13,11 @@ fixed_leg_hold:
     status_period: 0.50
 
     # Safer first-run leg hold.
-    kp: 3.0
-    kd: 0.20
-    max_effort: 2.0
-    target_slew_rate: 0.60
-    ready_tolerance: 0.050
+    kp: 8.0
+    kd: 0.35
+    max_effort: 3.0
+    target_slew_rate: 1.0
+    ready_tolerance: 0.18
 
     # First-run target: current q=0 Gazebo posture.
     wheel_1_target_x: 0.204820
@@ -68,8 +68,8 @@ lqr_balance_controller:
     k_x_dot: 1.76654387
 
     # Conservative first-run wheel torque.
-    max_total_wheel_torque: 0.15
-    torque_slew_rate: 1.0
+    max_total_wheel_torque: 0.50
+    torque_slew_rate: 3.0
     fall_angle_deg: 30.0
 
     # Initial q=0 leg height from current kinematics.
