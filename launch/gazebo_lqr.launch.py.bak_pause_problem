@@ -164,15 +164,12 @@ def generate_launch_description():
                 kinematics_node,
                 fixed_leg_node,
                 lqr_node,
-                # Start the leg controller first, then the wheel controller.
-                # Avoid simultaneous controller-manager service calls.
                 TimerAction(
                     period=0.20,
-                    actions=[leg_controller_spawner],
-                ),
-                TimerAction(
-                    period=0.80,
-                    actions=[wheel_controller_spawner],
+                    actions=[
+                        wheel_controller_spawner,
+                        leg_controller_spawner,
+                    ],
                 ),
             ],
         )
